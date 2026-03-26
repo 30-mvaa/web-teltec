@@ -20,6 +20,8 @@ class Usuario(AbstractUser):
     activo = models.BooleanField(default=True)
     reset_token = models.CharField(max_length=100, null=True, blank=True)
     reset_token_expires = models.DateTimeField(null=True, blank=True)
+    last_activity = models.DateTimeField(null=True, blank=True, help_text="Última actividad del usuario para timeout de sesión")
+    session_timeout_minutes = models.IntegerField(default=30, help_text="Tiempo de expire de sesión en minutos")
     
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nombre', 'rol']

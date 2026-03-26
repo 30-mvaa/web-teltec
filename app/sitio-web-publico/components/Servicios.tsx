@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Wifi, Building2, Video, Code, Settings, ArrowRight } from "lucide-react"
+import { Wifi, Building2, Video, Code, Settings, ArrowRight, Home, Shield, Bell, Lock, Cpu, Sparkles } from "lucide-react"
 
 interface Servicio {
   id: number
@@ -17,70 +17,54 @@ interface ServiciosProps {
   onServiceClick: (serviceType: string) => void
 }
 
-const serviceIcons = [Wifi, Building2, Video, Code, Settings]
-const serviceColors = [
-  { icon: "text-blue-600", bg: "bg-blue-100", border: "border-blue-200" },
-  { icon: "text-green-600", bg: "bg-green-100", border: "border-green-200" },
-  { icon: "text-blue-600", bg: "bg-blue-100", border: "border-blue-200" },
-  { icon: "text-green-600", bg: "bg-green-100", border: "border-green-200" },
-  { icon: "text-blue-600", bg: "bg-blue-100", border: "border-blue-200" },
+const serviciosData = [
+  { id: 1, nombre: "Domotizaciones", descripcion: "Automatiza tu hogar con sistemas inteligentes.", icono: "cpu", serviceType: "domotizaciones", gradient: "from-violet-500 to-purple-600" },
+  { id: 2, nombre: "Casas Inteligentes", descripcion: "Transforma tu vivienda con tecnología de punta.", icono: "home", serviceType: "casas_inteligentes", gradient: "from-cyan-500 to-blue-600" },
+  { id: 3, nombre: "Desarrollo Software", descripcion: "Soluciones personalizadas para tu empresa.", icono: "code", serviceType: "desarrollo_software", gradient: "from-green-500 to-emerald-600" },
+  { id: 4, nombre: "Cámaras Seguridad", descripcion: "Videovigilancia HD con acceso remoto.", icono: "video", serviceType: "camaras_seguridad", gradient: "from-red-500 to-orange-600" },
+  { id: 5, nombre: "Alarmas", descripcion: "Sistemas con monitoreo 24/7.", icono: "bell", serviceType: "alarmas", gradient: "from-amber-500 to-yellow-600" },
+  { id: 6, nombre: "Cierres Eléctricos", descripcion: "Automatización de puertas y portones.", icono: "lock", serviceType: "cierres_electricos", gradient: "from-blue-500 to-indigo-600" },
 ]
 
+const iconMap: { [key: string]: any } = { wifi: Wifi, home: Home, code: Code, video: Video, bell: Bell, lock: Lock, settings: Settings, cpu: Cpu }
+
 export default function Servicios({ servicios, onServiceClick }: ServiciosProps) {
-  const serviceTypes = ['emprendimientos', 'empresarial', 'camaras', 'desarrollo', 'mantenimiento']
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
 
-  if (servicios.length === 0) {
-    return null
-  }
-
   return (
-    <section id="servicios" className="relative bg-white border-t border-gray-200 overflow-hidden">
-      <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20 z-10">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-gray-900 mb-4">
-            Nuestros <span className="text-blue-600">Servicios</span>
+    <section id="servicios" className="py-8 md:py-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-3">
+            <Sparkles className="w-3 h-3 text-cyan-400" />
+            <span className="text-xs font-semibold text-white">Servicios</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+            Nuestros <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Servicios</span>
           </h2>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Soluciones de conectividad adaptadas a tus necesidades. Desde internet residencial hasta soluciones empresariales completas.
-          </p>
+          <p className="text-sm text-slate-300 max-w-xl mx-auto">Soluciones integrales para hogar y empresa.</p>
         </div>
         
-        {/* Services Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {servicios.map((servicio: Servicio, index: number) => {
-            const Icon = serviceIcons[index % serviceIcons.length]
-            const colors = serviceColors[index % serviceColors.length]
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {serviciosData.map((servicio, index) => {
+            const Icon = iconMap[servicio.icono] || Wifi
             const isHovered = hoveredIndex === index
             
             return (
-              <div 
-                key={servicio.id || index} 
-                className="group rounded-xl border border-gray-200 bg-white p-6 space-y-4 cursor-pointer transition-all hover:border-blue-300 hover:shadow-md"
-                onClick={() => onServiceClick(serviceTypes[index % serviceTypes.length])}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {/* Icon */}
-                <div className={`inline-flex p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
-                  <Icon className={`w-6 h-6 ${colors.icon}`} />
+              <div key={servicio.id} className={`group relative rounded-2xl border p-5 cursor-pointer transition-all duration-300 hover:-translate-y-1 ${
+                isHovered ? "bg-white/10 backdrop-blur-xl border-cyan-500/30" : "bg-white/5 backdrop-blur-sm border-white/10 hover:bg-white/10"
+              }`}
+              onClick={() => onServiceClick(servicio.serviceType)}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}>
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${servicio.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                  <Icon className="w-6 h-6 text-white" />
                 </div>
-                
-                {/* Content */}
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                    {servicio.nombre}
-                  </h3>
-                  <p className="text-base text-gray-600 leading-relaxed">
-                    {servicio.descripcion}
-                  </p>
-                </div>
-                
-                {/* Arrow */}
-                <div className="flex items-center gap-2 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-xs font-semibold">Más información</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <h3 className="text-base font-bold text-white group-hover:text-cyan-300">{servicio.nombre}</h3>
+                <p className="text-xs text-slate-300 mt-1">{servicio.descripcion}</p>
+                <div className="flex items-center gap-2 text-cyan-400 mt-3 text-xs font-semibold">
+                  <span>Más info</span>
+                  <ArrowRight className="w-3 h-3 group-hover:translate-x-1" />
                 </div>
               </div>
             )

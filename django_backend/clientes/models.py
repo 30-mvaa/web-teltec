@@ -12,13 +12,6 @@ class Cliente(models.Model):
         ('suspendido', 'Suspendido'),
     ]
     
-    ESTADOS_PAGO_CHOICES = [
-        ('al_dia', 'Al día'),
-        ('proximo_vencimiento', 'Próximo vencimiento'),
-        ('vencido', 'Vencido'),
-        ('corte_pendiente', 'Corte pendiente'),
-    ]
-    
     # Validadores
     cedula_validator = RegexValidator(
         regex=r'^\d{10}$',
@@ -34,17 +27,17 @@ class Cliente(models.Model):
     cedula = models.CharField(max_length=10, unique=True, validators=[cedula_validator])
     nombres = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)
-    tipo_plan = models.CharField(max_length=50)
-    precio_plan = models.DecimalField(max_digits=10, decimal_places=2)
     fecha_nacimiento = models.DateField()
     direccion = models.TextField()
-    sector = models.CharField(max_length=100)
     email = models.EmailField()
     telefono = models.CharField(max_length=10, validators=[telefono_validator])
     telegram_chat_id = models.CharField(max_length=50, blank=True, null=True)
     estado = models.CharField(max_length=20, choices=ESTADOS_CHOICES, default='activo')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    # Relaciones normalizadas
+    id_sector = models.ForeignKey('sectores_app.Sector', on_delete=models.SET_NULL, null=True, blank=True, db_column='id_sector')
     
     class Meta:
         db_table = 'clientes'
@@ -69,41 +62,30 @@ class Cliente(models.Model):
         )
     
     @property
-    def estado_pago(self):
-        """Calcular estado de pago del cliente"""
-        from .services import ClienteService
-        return ClienteService.calcular_estado_pago(self)
+    def sector_nombre(self):
+        """Obtener nombre del sector"""
+        return self.id_sector.nombre_sector if self.id_sector else None
     
     @property
-    def meses_pendientes(self):
-        """Calcular meses pendientes de pago"""
-        from .services import ClienteService
-        return ClienteService.calcular_meses_pendientes(self)
+    def plan_actual(self):
+        """Obtener el plan actual del cliente"""
+        from clientes_planes_app.models import ClientePlan
+        return ClientePlan.objects.filter(
+            id_cliente=self.id,
+            estado='activo'
+        ).first()
     
     @property
-    def monto_total_deuda(self):
-        """Calcular monto total de deuda"""
-        from .services import ClienteService
-        return ClienteService.calcular_deuda_total(self)
+    def tipo_plan_actual(self):
+        """Obtener tipo de plan actual"""
+        plan = self.plan_actual
+        return plan.id_plan.tipo_plan if plan else None
     
-    def validar_cedula_ecuatoriana(self):
-        """Validar cédula ecuatoriana"""
-        from .services import ClienteService
-        return ClienteService.validar_cedula_ecuatoriana(self.cedula)
-    
-    def validar_mayor_edad(self):
-        """Validar que el cliente sea mayor de edad"""
-        return self.edad >= 18
-    
-    def save(self, *args, **kwargs):
-        """Override save para validaciones"""
-        if not self.validar_cedula_ecuatoriana():
-            raise ValueError("Cédula ecuatoriana inválida")
-        
-        if not self.validar_mayor_edad():
-            raise ValueError("El cliente debe ser mayor de edad")
-        
-        super().save(*args, **kwargs)
+    @property
+    def precio_plan_actual(self):
+        """Obtener precio del plan actual"""
+        plan = self.plan_actual
+        return float(plan.id_plan.precio) if plan else 0.0
 
 
 

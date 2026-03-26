@@ -180,3 +180,30 @@ class Footer(models.Model):
     class Meta:
         verbose_name = "Footer"
         verbose_name_plural = "Footer"
+
+class SolicitudInstalacion(models.Model):
+    """Modelo para solicitudes de instalación desde el sitio web"""
+    nombre = models.CharField(max_length=200)
+    telefono = models.CharField(max_length=20)
+    email = models.EmailField()
+    direccion = models.TextField()
+    plan = models.CharField(max_length=100, blank=True, null=True)
+    comentarios = models.TextField(blank=True, null=True)
+    estado = models.CharField(
+        max_length=20,
+        choices=[
+            ('pendiente', 'Pendiente'),
+            ('contactado', 'Contactado'),
+            ('agendado', 'Agendado'),
+            ('completado', 'Completado'),
+            ('cancelado', 'Cancelado')
+        ],
+        default='pendiente'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Solicitud de Instalación"
+        verbose_name_plural = "Solicitudes de Instalación"
+        ordering = ['-fecha_creacion']

@@ -18,36 +18,10 @@ class ConfiguracionSistema(models.Model):
     def __str__(self):
         return f"{self.clave}: {self.valor}"
 
-class Plan(models.Model):
-    """Modelo para planes de internet"""
-    nombre = models.CharField(max_length=100, unique=True)
-    precio = models.DecimalField(max_digits=10, decimal_places=2)
-    velocidad = models.CharField(max_length=50, blank=True, null=True)
-    descripcion = models.TextField(blank=True, null=True)
-    activo = models.BooleanField(default=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_actualizacion = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        db_table = 'configuracion_planes'
-        verbose_name = 'Plan'
-        verbose_name_plural = 'Planes'
-    
-    def __str__(self):
-        return f"{self.nombre} - ${self.precio}"
-
-class Sector(models.Model):
-    """Modelo para sectores de cobertura"""
-    nombre = models.CharField(max_length=100, unique=True)
-    descripcion = models.TextField(blank=True, null=True)
-    activo = models.BooleanField(default=True)
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-    fecha_actualizacion = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        db_table = 'configuracion_sectores'
-        verbose_name = 'Sector'
-        verbose_name_plural = 'Sectores'
-    
-    def __str__(self):
-        return self.nombre
+# NOTA: Los modelos Plan y Sector se eliminaron porque ya existen en:
+# - planes_app.models.Plan (tabla 'planes')
+# - sectores_app.models.Sector (tabla 'sectores')
+# 
+# Para usar estos modelos, importarlos desde sus respectivas apps:
+# from planes_app.models import Plan
+# from sectores_app.models import Sector

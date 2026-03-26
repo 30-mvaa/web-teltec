@@ -1,6 +1,6 @@
 "use client"
 
-import { X, Phone, MessageCircle, CheckCircle } from "lucide-react"
+import { X, Phone, MessageCircle, CheckCircle, Cpu, Home, Code, Video, Bell, Lock, Wifi, Shield, Calendar, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getWhatsAppLink } from "../lib/whatsapp"
 
@@ -11,7 +11,6 @@ interface ModalsProps {
   onCloseService: () => void
 }
 
-// Función para obtener información detallada de productos
 const getProductDetails = (productType: string | null) => {
   if (!productType) {
     return {
@@ -73,7 +72,6 @@ const getProductDetails = (productType: string | null) => {
   }
 }
 
-// Función para obtener información detallada de servicios
 const getServiceDetails = (serviceType: string | null) => {
   if (!serviceType) {
     return {
@@ -81,41 +79,231 @@ const getServiceDetails = (serviceType: string | null) => {
       subtitle: 'Descripción del servicio',
       description: 'Información del servicio seleccionado.',
       features: [],
-      benefits: []
+      benefits: [],
+      process: [],
+      includes: []
     }
   }
 
   switch (serviceType) {
-    case 'emprendimientos':
+    case 'domotizaciones':
       return {
-        title: 'Internet para Emprendimientos',
-        subtitle: 'Conectividad diseñada para emprendedores',
-        description: 'Conexión de alta velocidad especialmente diseñada para emprendedores y pequeñas empresas. Ideal para e-commerce, marketing digital, videoconferencias y comunicación empresarial.',
+        title: 'Domotizaciones',
+        subtitle: 'Automatiza tu hogar con tecnología inteligente',
+        description: 'Transformamos tu casa en un hogar inteligente mediante la instalación de sistemas domóticos que permiten controlar iluminación, climatización, persianas, electrodomésticos y más desde tu smartphone o asistentes de voz.',
         features: [
-          { icon: 'Wifi', text: 'Alta Velocidad', description: 'Conexión estable y rápida para múltiples dispositivos' },
-          { icon: 'Smartphone', text: 'E-commerce', description: 'Optimizado para plataformas de venta online' },
+          { icon: 'Cpu', text: 'Control Centralizado', description: 'Gestiona todos los dispositivos desde una sola aplicación' },
+          { icon: 'Wifi', text: 'Control Remoto', description: 'Accede y controla tu hogar desde cualquier lugar del mundo' },
+          { icon: 'Calendar', text: 'Programación Inteligente', description: 'Automatiza tareas según horarios y rutinas personalizadas' },
+          { icon: 'Shield', text: 'Integración con Seguridad', description: 'Conecta sensores, alarmas y cámaras en un mismo sistema' },
+          { icon: 'Star', text: 'Escenarios Personalizados', description: 'Crea modos como "Noche", "Salir de casa", "Película"' },
+          { icon: 'Code', text: 'Compatibilidad', description: 'Funciona con Alexa, Google Home, Siri y más' },
         ],
         benefits: [
-          'Instalación gratuita',
-          'Soporte técnico especializado',
-          'Garantía de velocidad',
-          'Sin límite de datos'
+          'Ahorro energético hasta 30%',
+          'Comodidad y accesibilidad',
+          'Aumento del valor de tu propiedad',
+          'Seguridad mejorada',
+          'Control total desde tu celular'
+        ],
+        process: [
+          'Visita técnica y evaluación',
+          'Diseño del sistema personalizado',
+          'Instalación de dispositivos',
+          'Configuración e integración',
+          'Capacitación y soporte'
+        ],
+        includes: [
+          'Servidor local o cloud',
+          'Interruptores inteligentes',
+          'Sensores de movimiento',
+          'Termostatos inteligentes',
+          'App de control gratuita'
         ]
       }
-    case 'empresarial':
+    case 'casas_inteliges':
+    case 'casas_inteligentes':
       return {
-        title: 'Internet Empresarial',
-        subtitle: 'Conectividad dedicada para empresas',
-        description: 'Soluciones de conectividad dedicada para empresas medianas y grandes. Conexión estable, redundante y soporte técnico especializado 24/7.',
+        title: 'Casas Inteligentes',
+        subtitle: 'El futuro de la vivienda hoy',
+        description: 'Implementamos soluciones completas de vivienda inteligente que integran todos los sistemas del hogar: iluminación, climatización, seguridad, entretenimiento y electrodomésticos. Una casa que piensa, aprende y se adapta a ti.',
         features: [
-          { icon: 'Building2', text: 'Conexión Dedicada', description: 'Línea exclusiva para tu empresa' },
-          { icon: 'Server', text: 'Redundancia', description: 'Múltiples rutas de conexión para máxima disponibilidad' },
+          { icon: 'Home', text: 'Integración Total', description: 'Todos los sistemas conectados y controlados desde una sola plataforma' },
+          { icon: 'Cpu', text: 'Inteligencia Artificial', description: 'El sistema aprende de tus hábitos y automatiza acciones' },
+          { icon: 'Shield', text: 'Seguridad Integral', description: 'Alarmas, cámaras, sensores y cerraduras inteligentes' },
+          { icon: 'Wifi', text: 'Conectividad Mesh', description: 'WiFi cobertura completa en toda la vivienda' },
+          { icon: 'Star', text: 'Asistentes Virtuales', description: 'Control por voz con Alexa, Google y Siri' },
+          { icon: 'Calendar', text: 'Rutinas Automáticas', description: 'El hogar se adapta a tu estilo de vida' },
         ],
         benefits: [
-          'SLA garantizado del 99.9%',
-          'Soporte técnico prioritario',
-          'Instalación profesional',
-          'Monitoreo 24/7'
+          'Confort total y personalización',
+          'Ahorro energético significativo',
+          'Mayor seguridad y tranquilidad',
+          'Valor agregado a tu propiedad',
+          'Acceso y control remoto'
+        ],
+        process: [
+          'Auditoría del hogar',
+          'Diseño del proyecto',
+          'Instalación de infraestructura',
+          'Configuración de sistemas',
+          'Pruebas y capacitación'
+        ],
+        includes: [
+          'Panel de control inteligente',
+          'Sistema de iluminación LED',
+          'Climatización automatizada',
+          'Cerraduras biométricas',
+          'Cámaras de seguridad',
+          'Sensores diversos'
+        ]
+      }
+    case 'desarrollo_software':
+      return {
+        title: 'Desarrollo de Software',
+        subtitle: 'Soluciones tecnológicas personalizadas',
+        description: 'Diseñamos y desarrollamos software a medida para empresas y proyectos específicos. Desde aplicaciones web y móviles hasta sistemas de gestión empresariales. Transformamos tus ideas en soluciones digitales.',
+        features: [
+          { icon: 'Code', text: 'Desarrollo Web', description: 'Sitios web, portales y aplicaciones web responsivas' },
+          { icon: 'Cpu', text: 'Aplicaciones Móviles', description: 'Apps nativas e híbridas para iOS y Android' },
+          { icon: 'Shield', text: 'Sistemas ERP', description: 'Software de gestión empresarial personalizado' },
+          { icon: 'Wifi', text: 'Integraciones API', description: 'Conectamos tus sistemas con servicios externos' },
+          { icon: 'Star', text: 'Bases de Datos', description: 'Diseño y optimización de bases de datos' },
+          { icon: 'Calendar', text: 'Mantenimiento', description: 'Soporte y actualizaciones continuas' },
+        ],
+        benefits: [
+          'Soluciones 100% personalizadas',
+          'Escalabilidad para crecimiento',
+          'Soporte técnico especializado',
+          'Documentación completa',
+          'Entrega en tiempos acordados'
+        ],
+        process: [
+          'Requisitos y análisis',
+          'Diseño y prototipado',
+          'Desarrollo iterativo',
+          'Pruebas de calidad',
+          'Despliegue y lanzamiento',
+          'Mantenimiento posterior'
+        ],
+        includes: [
+          'Análisis de requisitos',
+          'Diseño UX/UI profesional',
+          'Código fuente documentado',
+          'Pruebas completas',
+          'Manual de usuario',
+          '3 meses de soporte gratuito'
+        ]
+      }
+    case 'camaras_seguridad':
+      return {
+        title: 'Cámaras de Seguridad',
+        subtitle: 'Protección visual las 24 horas',
+        description: 'Sistemas de videovigilancia de alta definición con tecnología de punta. Protege tu hogar o negocio con cámaras interiores y exteriores, visión nocturna, detección inteligente y acceso remoto en tiempo real.',
+        features: [
+          { icon: 'Video', text: 'Resolución 4K', description: 'Imágenes Ultra HD para detalles precisos' },
+          { icon: 'Moon', text: 'Visión Nocturna', description: 'Vision nocturna a color hasta 30 metros' },
+          { icon: 'Wifi', text: 'Conexión WiFi/LAN', description: 'Instalación cableada o inalámbrica' },
+          { icon: 'Cpu', text: 'Detección IA', description: 'Reconoce personas, vehículos y mascotas' },
+          { icon: 'Shield', text: 'Alertas en Tiempo Real', description: 'Notificaciones push ante movimiento' },
+          { icon: 'Star', text: 'Audio Bidireccional', description: 'Escucha y habla desde la app' },
+        ],
+        benefits: [
+          'Monitoreo remoto 24/7',
+          'Grabación en la nube o local',
+          'Evidencia visual ante incidentes',
+          'Descuentos en seguros',
+          'Disuasión contra ladrones'
+        ],
+        process: [
+          'Inspección del área',
+          'Diseño del sistema',
+          'Instalación de cámaras',
+          'Configuración de red',
+          'Configuración de app',
+          'Pruebas y capacitación'
+        ],
+        includes: [
+          'Cámaras HD de alta calidad',
+          'Grabador NVR/DVR',
+          'Disco duro de almacenamiento',
+          'Cables y accesorios',
+          'App EZVIZ gratuita',
+          'Soporte técnico'
+        ]
+      }
+    case 'alarmas':
+      return {
+        title: 'Alarmas',
+        subtitle: 'Seguridad activa para tu tranquilidad',
+        description: 'Sistemas de alarma interconectados con monitoreo profesional 24/7. Detecta intrusiones, incendios, fugas de gas y más. Alertas inmediatas a tu celular y a nuestra central de monitoreo.',
+        features: [
+          { icon: 'Bell', text: 'Detección Multi-sensor', description: 'Sensores de movimiento, apertura, vibración' },
+          { icon: 'Shield', text: 'Monitoreo 24/7', description: 'Central de monitoreo vela por ti' },
+          { icon: 'Wifi', text: 'Conexión GSM/WiFi', description: 'Doble vía de comunicación' },
+          { icon: 'Cpu', text: 'Zonas Configurables', description: 'Divide tu propiedad en zonas independientes' },
+          { icon: 'Star', text: 'Notificaciones Instantáneas', description: 'Alertas inmediatas a tu celular' },
+          { icon: 'Calendar', text: 'Armado Programado', description: 'Programa horarios de activación' },
+        ],
+        benefits: [
+          'Respuesta inmediata ante emergencias',
+          'Cobertura completa (intrusión, fuego, gas)',
+          'Descuento en seguros patrimoniales',
+          'Botón de pánico',
+          ' llave inteligente'
+        ],
+        process: [
+          'Evaluación de riesgos',
+          'Diseño del sistema',
+          'Instalación de sensores',
+          'Configuración central',
+          'Pruebas de funcionamiento',
+          'Capacitación'
+        ],
+        includes: [
+          'Panel de control',
+          'Sensores de movimiento',
+          'Sensores de apertura',
+          'Sirena de alarma',
+          'Teclado y controles',
+          'App de monitoreo'
+        ]
+      }
+    case 'cierres_electricos':
+      return {
+        title: 'Cierres Eléctricos',
+        subtitle: 'Automatización de accesos',
+        description: 'Sistemas de automatización para puertas y portones. Controla el acceso a tu propiedad desde cualquier lugar. Seguridad y comodidad con tecnología de última generación.',
+        features: [
+          { icon: 'Lock', text: 'Control Remoto', description: 'Abre y cierra desde tu celular' },
+          { icon: 'Wifi', text: 'Conexión WiFi', description: 'Sin necesidad de cables adicionales' },
+          { icon: 'Shield', text: 'Cerraduras Inteligentes', description: 'Sin llaves, acceso con código o huella' },
+          { icon: 'Cpu', text: 'Apertura Automática', description: 'Detecta tu llegada y abre solo' },
+          { icon: 'Star', text: 'Registro de Accesos', description: 'Historial de quién entró y cuándo' },
+          { icon: 'Calendar', text: 'Códigos Temporales', description: 'Genera códigos para visitantes' },
+        ],
+        benefits: [
+          'Olvídate de las llaves',
+          'Comparte acceso temporalmente',
+          'Mayor seguridad',
+          'Comodidad total',
+          'Integración con domótica'
+        ],
+        process: [
+          'Inspección del tipo de puerta/portón',
+          'Recomendación del sistema',
+          'Instalación del motor/cerradura',
+          'Configuración de accesos',
+          'Pruebas de funcionamiento',
+          'Capacitación'
+        ],
+        includes: [
+          'Motor de portón o cerradura',
+          'Control remoto',
+          'Teclado numérico',
+          'Sensor de seguridad',
+          'App de control',
+          'Garantía extendida'
         ]
       }
     default:
@@ -124,34 +312,33 @@ const getServiceDetails = (serviceType: string | null) => {
         subtitle: 'Descripción del servicio',
         description: 'Información del servicio seleccionado.',
         features: [],
-        benefits: []
+        benefits: [],
+        process: [],
+        includes: []
       }
   }
 }
 
 export default function Modals({ selectedProduct, selectedService, onCloseProduct, onCloseService }: ModalsProps) {
-  // Modal de Producto
   const productDetails = selectedProduct ? getProductDetails(selectedProduct) : null
-
-  // Modal de Servicio
   const serviceDetails = selectedService ? getServiceDetails(selectedService) : null
 
   return (
     <>
       {/* Modal de Producto */}
       {selectedProduct && productDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">
                 {productDetails.title}
               </h2>
               <button
                 onClick={onCloseProduct}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                 aria-label="Cerrar modal"
               >
-                <X className="w-6 h-6 text-gray-500" />
+                <X className="w-6 h-6 text-slate-500" />
               </button>
             </div>
             
@@ -160,46 +347,44 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                 <p className="text-lg text-blue-600 font-semibold mb-2">
                   {productDetails.subtitle}
                 </p>
-                <p className="text-gray-600 leading-relaxed">
+                <p className="text-slate-600 leading-relaxed">
                   {productDetails.description}
                 </p>
               </div>
               
-              {/* Características principales */}
               <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Características Principales</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Características Principales</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {productDetails.features.map((feature, index) => (
-                    <div key={index} className="flex items-start p-4 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-xl border border-blue-600/20">
-                      <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
-                        <CheckCircle className="w-6 h-6 text-white" />
+                    <div key={index} className="flex items-start p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                        <CheckCircle className="w-6 h-6 text-blue-600" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-900 mb-1">{feature.text}</h4>
-                        <p className="text-sm text-gray-600">{feature.description}</p>
+                        <h4 className="font-semibold text-slate-900 mb-1">{feature.text}</h4>
+                        <p className="text-sm text-slate-600">{feature.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
               
-              {/* Modelos disponibles */}
               {productDetails.models.length > 0 && (
                 <div className="mb-8">
-                  <h3 className="text-xl font-bold text-gray-900 mb-4">Modelos Disponibles</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-4">Modelos Disponibles</h3>
                   <div className="space-y-4">
                     {productDetails.models.map((model, index) => (
-                      <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+                      <div key={index} className="border border-slate-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <h4 className="text-lg font-bold text-gray-900">{model.name}</h4>
-                            <p className="text-gray-600 text-sm">{model.description}</p>
+                            <h4 className="text-lg font-bold text-slate-900">{model.name}</h4>
+                            <p className="text-slate-600 text-sm">{model.description}</p>
                           </div>
                           <span className="text-lg font-bold text-green-600">{model.price}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {model.features.map((feature, featureIndex) => (
-                            <span key={featureIndex} className="px-3 py-1 bg-blue-600/10 text-blue-600 text-xs rounded-full">
+                            <span key={featureIndex} className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                               {feature}
                             </span>
                           ))}
@@ -210,11 +395,10 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                 </div>
               )}
 
-              {/* Botones de acción */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   onClick={() => window.open(getWhatsAppLink(), '_blank')}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <Phone className="w-5 h-5 mr-2" />
                   Solicitar Cotización
@@ -225,7 +409,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                     onCloseProduct()
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Más Información
@@ -238,18 +422,18 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
 
       {/* Modal de Servicio */}
       {selectedService && serviceDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">
                 {serviceDetails.title}
               </h2>
               <button
                 onClick={onCloseService}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
                 aria-label="Cerrar modal"
               >
-                <X className="w-6 h-6" />
+                <X className="w-6 h-6 text-slate-500" />
               </button>
             </div>
             
@@ -258,47 +442,79 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                 <p className="text-lg text-blue-600 font-semibold mb-2">
                   {serviceDetails.subtitle}
                 </p>
-                <p className="text-gray-600 leading-relaxed">
+                <p className="text-slate-600 leading-relaxed">
                   {serviceDetails.description}
                 </p>
               </div>
               
-              {/* Características principales */}
               <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Características Principales</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Características Principales</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {serviceDetails.features.map((feature, index) => (
-                    <div key={index} className="flex items-start p-4 bg-gradient-to-r from-blue-600/10 to-green-600/10 rounded-xl border border-blue-600/20">
-                      <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-4 flex-shrink-0">
-                        <CheckCircle className="w-5 h-5 text-white" />
+                    <div key={index} className="flex items-start p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                        <CheckCircle className="w-6 h-6 text-blue-600" />
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-900 mb-1">{feature.text}</h4>
-                        <p className="text-gray-600 text-sm">{feature.description}</p>
+                        <h4 className="font-semibold text-slate-900 mb-1">{feature.text}</h4>
+                        <p className="text-sm text-slate-600">{feature.description}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Beneficios */}
-              <div className="mb-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Beneficios Incluidos</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {serviceDetails.benefits.map((benefit, index) => (
-                    <div key={index} className="flex items-center p-3 bg-green-600/10 rounded-lg border border-green-600/20">
-                      <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700 font-medium">{benefit}</span>
-                    </div>
-                  ))}
+              {serviceDetails.benefits && serviceDetails.benefits.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold text-slate-900 mb-4">Beneficios Incluidos</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {serviceDetails.benefits.map((benefit, index) => (
+                      <div key={index} className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                        <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0" />
+                        <span className="text-slate-700 font-medium">{benefit}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Botones de acción */}
+              {serviceDetails.includes && serviceDetails.includes.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold text-slate-900 mb-4">¿Qué Incluye el Servicio?</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {serviceDetails.includes.map((item, index) => (
+                      <div key={index} className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <Star className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0" />
+                        <span className="text-slate-700 font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {serviceDetails.process && serviceDetails.process.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="text-xl font-bold text-slate-900 mb-4">Proceso de Trabajo</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {serviceDetails.process.map((step, index) => (
+                      <div key={index} className="flex items-center">
+                        <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-2">
+                          {index + 1}
+                        </span>
+                        <span className="text-slate-700 font-medium mr-3">{step}</span>
+                        {index < serviceDetails.process.length - 1 && (
+                          <span className="text-slate-300 mr-3">→</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   onClick={() => window.open(getWhatsAppLink(), '_blank')}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <Phone className="w-5 h-5 mr-2" />
                   Solicitar Servicio
@@ -309,7 +525,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                     onCloseService()
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300"
+                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Más Información
@@ -322,4 +538,3 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
     </>
   )
 }
-

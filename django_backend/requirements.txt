@@ -9,3 +9,4 @@ Pillow==10.4.0
 reportlab==4.1.0
 python-decouple==3.8
 urllib3<2.0.0 
+weasyprint==66.0 

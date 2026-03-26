@@ -82,6 +82,11 @@ export function MonthSelector({ clienteId, onMesesSeleccionados, onMontoTotalCha
     
     try {
       const response = await fetch(`http://localhost:8000/api/pagos/cliente/${clienteId}/meses/`)
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status}`)
+      }
+      
       const data = await response.json()
       
       if (data.success) {
@@ -91,6 +96,7 @@ export function MonthSelector({ clienteId, onMesesSeleccionados, onMontoTotalCha
         setError(data.message || 'Error al cargar meses disponibles')
       }
     } catch (error) {
+      console.error('Error cargando meses disponibles:', error)
       setError('Error de conexión al cargar meses disponibles')
     } finally {
       setLoading(false)

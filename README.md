@@ -62,12 +62,13 @@ GRANT ALL PRIVILEGES ON DATABASE teltec_db TO teltec_user;
 ## 📊 Módulos del Sistema
 
 ### ✅ Módulos Completamente Funcionales
-- **🔐 Autenticación**: Login, recuperación de contraseña, roles y permisos
+- **🔐 Autenticación**: Login, recuperación de contraseña, roles y permisos, timeout de sesión (30 min)
 - **👥 Gestión de Usuarios**: CRUD completo con roles (administrador, economía, atención cliente)
 - **👤 Gestión de Clientes**: CRUD completo con validaciones y campo Telegram
-- **💰 Gestión de Pagos**: Registro de pagos, comprobantes PDF, envío por email
+- **💰 Gestión de Pagos**: Registro de pagos, comprobantes PDF, envío por email, bulk import
 - **⚠️ Gestión de Deudas**: Control de pagos vencidos y cálculo automático
-- **🧾 Gestión de Gastos**: Control de gastos empresariales
+- **🧾 Gestión de Gastos**: Control de gastos empresariales, reportes ingresos vs gastos
+- **👤 Perfil de Usuario**: Edición de nombre, cambio de contraseña
 - **💬 Notificaciones**: Sistema de notificaciones Telegram automáticas
 - **📊 Reportes**: Reportes detallados con exportación a Excel
 - **⚙️ Configuración**: Configuración del sistema, planes y sectores
@@ -80,6 +81,8 @@ GRANT ALL PRIVILEGES ON DATABASE teltec_db TO teltec_user;
 - **Responsive Design**: Interfaz adaptable a todos los dispositivos
 - **Real-time Updates**: Actualizaciones en tiempo real
 - **Data Export**: Exportación de datos a Excel
+- **Session Security**: Timeout de 30 minutos con heartbeat automático
+- **Modern UI**: Diálogos de confirmación de logout
 
 ## 🔌 APIs Disponibles
 

@@ -6,16 +6,17 @@ from django.db import connection
 from django.http import HttpResponse
 from datetime import datetime
 import calendar
-# from reportlab.lib import colors
-# from reportlab.lib.pagesizes import letter, A4
-# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
-# from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-# from reportlab.lib.units import inch
-# from reportlab.graphics.shapes import Drawing
-# from reportlab.graphics.charts.linecharts import HorizontalLineChart
-# from reportlab.graphics.charts.barcharts import VerticalBarChart
-# from reportlab.graphics.charts.piecharts import Pie
-# from reportlab.graphics import renderPDF
+# Importaciones de reportlab - ignorar errores de Pyright
+from reportlab.lib import colors  # type: ignore
+from reportlab.lib.pagesizes import letter, A4, landscape  # type: ignore
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image  # type: ignore
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
+from reportlab.lib.units import inch  # type: ignore
+from reportlab.graphics.shapes import Drawing  # type: ignore
+from reportlab.graphics.charts.linecharts import HorizontalLineChart  # type: ignore
+from reportlab.graphics.charts.barcharts import VerticalBarChart  # type: ignore
+from reportlab.graphics.charts.piecharts import Pie  # type: ignore
+from reportlab.graphics import renderPDF  # type: ignore
 import io
 
 @api_view(['GET'])
@@ -376,10 +377,46 @@ def reporte_anual_clientes(request):
 @permission_classes([AllowAny])
 def obtener_sectores(request):
     """Obtener todos los sectores únicos de la base de datos"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT DISTINCT sector FROM clientes WHERE sector IS NOT NULL AND sector != '' ORDER BY sector")
-            sectores = [row[0] for row in cursor.fetchall()]
+            # Intentar obtener sectores desde la tabla sectores (estructura normalizada)
+            try:
+                cursor.execute("""
+                    SELECT DISTINCT s.nombre_sector 
+                    FROM sectores s
+                    WHERE s.estado = 'activo'
+                    AND s.nombre_sector IS NOT NULL 
+                    AND s.nombre_sector != '' 
+                    AND TRIM(s.nombre_sector) != ''
+                    ORDER BY s.nombre_sector
+                """)
+                sectores = [row[0].strip() for row in cursor.fetchall() if row[0]]
+            except Exception as db_error:
+                logger.warning(f"Error al consultar sectores desde tabla sectores: {str(db_error)}")
+                # Fallback: intentar desde clientes con JOIN
+                try:
+                    cursor.execute("""
+                        SELECT DISTINCT s.nombre_sector 
+                        FROM clientes c
+                        JOIN sectores s ON c.id_sector = s.id_sector
+                        WHERE s.nombre_sector IS NOT NULL 
+                        AND s.nombre_sector != '' 
+                        AND TRIM(s.nombre_sector) != ''
+                        ORDER BY s.nombre_sector
+                    """)
+                    sectores = [row[0].strip() for row in cursor.fetchall() if row[0]]
+                except Exception as fallback_error:
+                    logger.warning(f"Error en fallback de sectores: {str(fallback_error)}")
+                    # Si no hay tabla de sectores, retornar lista vacía
+                    sectores = []
+        
+        # Limpiar y validar sectores
+        sectores = [s for s in sectores if s and isinstance(s, str) and len(s.strip()) > 0]
+        
+        logger.info(f"Sectores obtenidos: {len(sectores)}")
         
         return Response({
             'success': True,
@@ -387,8 +424,10 @@ def obtener_sectores(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        logger.error(f"Error al obtener sectores: {str(e)}", exc_info=True)
         return Response({
             'success': False,
+            'sectores': [],
             'message': f'Error al obtener sectores: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -670,11 +709,12 @@ def descargar_reporte_grafico_pdf(request):
     Descargar reporte gráfico anual en PDF usando ReportLab
     """
     try:
-        from reportlab.lib.pagesizes import letter, landscape
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch
-        from reportlab.lib import colors
+        # Importaciones de ReportLab comentadas temporalmente
+        # from reportlab.lib.pagesizes import letter, landscape
+        # from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        # from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        # from reportlab.lib.units import inch
+        # from reportlab.lib import colors
         from io import BytesIO
         
         year = request.GET.get('year', datetime.now().year)
@@ -841,3 +881,785 @@ def descargar_reporte_grafico_pdf(request):
             'success': False,
             'message': f'Error al generar PDF: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_dashboard(request):
+    """Reporte del dashboard principal con estadísticas generales"""
+    try:
+        with connection.cursor() as cursor:
+            # Estadísticas generales usando la vista normalizada
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_clientes,
+                    COUNT(CASE WHEN estado_pago = 'al_dia' THEN 1 END) as clientes_al_dia,
+                    COUNT(CASE WHEN estado_pago = 'vencido' THEN 1 END) as clientes_vencidos,
+                    COUNT(CASE WHEN estado_pago = 'pendiente' THEN 1 END) as clientes_pendientes,
+                    COALESCE(SUM(monto_total_deuda), 0) as total_deuda,
+                    COALESCE(AVG(monto_total_deuda), 0) as promedio_deuda,
+                    COALESCE(SUM(total_pagado), 0) as total_recaudado
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+            """)
+            
+            stats = cursor.fetchone()
+            
+            # Top 5 deudores
+            cursor.execute("""
+                SELECT nombres, apellidos, cedula, monto_total_deuda, meses_pendientes
+                FROM clientes_deuda
+                WHERE estado = 'activo' AND monto_total_deuda > 0
+                ORDER BY monto_total_deuda DESC
+                LIMIT 5
+            """)
+            
+            top_deudores = []
+            for row in cursor.fetchall():
+                top_deudores.append({
+                    'nombres': row[0],
+                    'apellidos': row[1],
+                    'cedula': row[2],
+                    'monto_deuda': float(row[3]),
+                    'meses_pendientes': row[4]
+                })
+            
+            # Recaudación del mes actual
+            current_month = datetime.now().month
+            current_year = datetime.now().year
+            
+            cursor.execute("""
+                SELECT COALESCE(SUM(monto), 0) as recaudacion_mes
+                FROM pagos
+                WHERE EXTRACT(MONTH FROM fecha_pago) = %s 
+                AND EXTRACT(YEAR FROM fecha_pago) = %s
+                AND estado = 'completado'
+            """, [current_month, current_year])
+            
+            recaudacion_mes = cursor.fetchone()[0] or 0
+            
+        return Response({
+            'success': True,
+            'data': {
+                'estadisticas_generales': {
+                    'total_clientes': stats[0],
+                    'clientes_al_dia': stats[1],
+                    'clientes_vencidos': stats[2],
+                    'clientes_pendientes': stats[3],
+                    'total_deuda': float(stats[4]),
+                    'promedio_deuda': float(stats[5]),
+                    'total_recaudado': float(stats[6])
+                },
+                'top_deudores': top_deudores,
+                'recaudacion_mes_actual': float(recaudacion_mes),
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_deudas_resumen(request):
+    """Reporte resumido de deudas usando la vista normalizada"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_clientes,
+                    COUNT(CASE WHEN estado_pago = 'al_dia' THEN 1 END) as al_dia,
+                    COUNT(CASE WHEN estado_pago = 'vencido' THEN 1 END) as vencidos,
+                    COUNT(CASE WHEN estado_pago = 'pendiente' THEN 1 END) as pendientes,
+                    COUNT(CASE WHEN estado_pago = 'por_vencer' THEN 1 END) as por_vencer,
+                    COALESCE(SUM(monto_total_deuda), 0) as deuda_total,
+                    COALESCE(SUM(total_pagado), 0) as pagado_total,
+                    COALESCE(AVG(monto_total_deuda), 0) as deuda_promedio
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+            """)
+            
+            resumen = cursor.fetchone()
+            
+        return Response({
+            'success': True,
+            'data': {
+                'resumen_deudas': {
+                    'total_clientes': resumen[0],
+                    'al_dia': resumen[1],
+                    'vencidos': resumen[2],
+                    'pendientes': resumen[3],
+                    'por_vencer': resumen[4],
+                    'deuda_total': float(resumen[5]),
+                    'pagado_total': float(resumen[6]),
+                    'deuda_promedio': float(resumen[7])
+                },
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_deudas_detalle(request):
+    """Reporte detallado de deudas por cliente"""
+    try:
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        year = request.GET.get('year', datetime.now().year)
+        offset = (page - 1) * page_size
+        
+        with connection.cursor() as cursor:
+            # Total de registros para el año especificado
+            cursor.execute("""
+                SELECT COUNT(*) FROM clientes_deuda 
+                WHERE estado = 'activo' AND EXTRACT(YEAR FROM fecha_registro) <= %s
+            """, [year])
+            total_registros = cursor.fetchone()[0]
+            
+            # Registros paginados para el año especificado
+            cursor.execute("""
+                SELECT 
+                    id, nombres, apellidos, cedula, sector,
+                    tipo_plan, precio_plan, fecha_registro,
+                    meses_pendientes, monto_total_deuda, total_pagado,
+                    estado_pago, fecha_ultimo_pago, fecha_vencimiento_pago
+                FROM clientes_deuda
+                WHERE estado = 'activo' AND EXTRACT(YEAR FROM fecha_registro) <= %s
+                ORDER BY monto_total_deuda DESC
+                LIMIT %s OFFSET %s
+            """, [year, page_size, offset])
+            
+            clientes = []
+            for row in cursor.fetchall():
+                clientes.append({
+                    'id': row[0],
+                    'nombres': row[1],
+                    'apellidos': row[2],
+                    'cedula': row[3],
+                    'sector': row[4],
+                    'tipo_plan': row[5],
+                    'precio_plan': float(row[6]),
+                    'fecha_registro': row[7].isoformat() if row[7] else None,
+                    'meses_pendientes': row[8],
+                    'monto_total_deuda': float(row[9]),
+                    'total_pagado': float(row[10]),
+                    'estado_pago': row[11],
+                    'fecha_ultimo_pago': row[12].isoformat() if row[12] else None,
+                    'fecha_vencimiento_pago': row[13].isoformat() if row[13] else None
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'year': int(year),
+                'clientes': clientes,
+                'paginacion': {
+                    'pagina_actual': page,
+                    'tamano_pagina': page_size,
+                    'total_registros': total_registros,
+                    'total_paginas': (total_registros + page_size - 1) // page_size
+                },
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_top_deudores(request):
+    """Reporte de los principales deudores"""
+    try:
+        limit = int(request.GET.get('limit', 10))
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    nombres, apellidos, cedula, sector,
+                    monto_total_deuda, meses_pendientes, estado_pago,
+                    fecha_ultimo_pago, total_pagado
+                FROM clientes_deuda
+                WHERE estado = 'activo' AND monto_total_deuda > 0
+                ORDER BY monto_total_deuda DESC
+                LIMIT %s
+            """, [limit])
+            
+            top_deudores = []
+            for row in cursor.fetchall():
+                top_deudores.append({
+                    'nombres': row[0],
+                    'apellidos': row[1],
+                    'cedula': row[2],
+                    'sector': row[3],
+                    'monto_deuda': float(row[4]),
+                    'meses_pendientes': row[5],
+                    'estado_pago': row[6],
+                    'fecha_ultimo_pago': row[7].isoformat() if row[7] else None,
+                    'total_pagado': float(row[8])
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'top_deudores': top_deudores,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_sectores_deuda(request):
+    """Reporte de deudas por sector"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    sector,
+                    COUNT(*) as total_clientes,
+                    COUNT(CASE WHEN estado_pago = 'al_dia' THEN 1 END) as al_dia,
+                    COUNT(CASE WHEN estado_pago = 'vencido' THEN 1 END) as vencidos,
+                    COUNT(CASE WHEN estado_pago = 'pendiente' THEN 1 END) as pendientes,
+                    COALESCE(SUM(monto_total_deuda), 0) as deuda_total,
+                    COALESCE(SUM(total_pagado), 0) as pagado_total,
+                    COALESCE(AVG(monto_total_deuda), 0) as deuda_promedio
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+                GROUP BY sector
+                ORDER BY deuda_total DESC
+            """)
+            
+            sectores = []
+            for row in cursor.fetchall():
+                sectores.append({
+                    'sector': row[0],
+                    'total_clientes': row[1],
+                    'al_dia': row[2],
+                    'vencidos': row[3],
+                    'pendientes': row[4],
+                    'deuda_total': float(row[5]),
+                    'pagado_total': float(row[6]),
+                    'deuda_promedio': float(row[7])
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'sectores': sectores,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_recaudacion_mensual(request):
+    """Reporte de recaudación mensual"""
+    try:
+        year = int(request.GET.get('year', datetime.now().year))
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    EXTRACT(MONTH FROM fecha_pago) as mes,
+                    COUNT(*) as total_pagos,
+                    COALESCE(SUM(monto), 0) as total_recaudado,
+                    COUNT(DISTINCT cliente_id) as clientes_activos
+                FROM pagos
+                WHERE EXTRACT(YEAR FROM fecha_pago) = %s
+                AND estado = 'completado'
+                GROUP BY EXTRACT(MONTH FROM fecha_pago)
+                ORDER BY mes
+            """, [year])
+            
+            meses = []
+            for row in cursor.fetchall():
+                mes_num = int(row[0])
+                meses.append({
+                    'mes': mes_num,
+                    'nombre_mes': calendar.month_name[mes_num],
+                    'nombre_mes_corto': calendar.month_abbr[mes_num],
+                    'total_pagos': row[1],
+                    'total_recaudado': float(row[2]),
+                    'clientes_activos': row[3]
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'anio': year,
+                'meses': meses,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_recaudacion_anual(request):
+    """Reporte de recaudación anual comparativa"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    EXTRACT(YEAR FROM fecha_pago) as anio,
+                    COUNT(*) as total_pagos,
+                    COALESCE(SUM(monto), 0) as total_recaudado,
+                    COUNT(DISTINCT cliente_id) as clientes_activos,
+                    COALESCE(AVG(monto), 0) as promedio_pago
+                FROM pagos
+                WHERE estado = 'completado'
+                GROUP BY EXTRACT(YEAR FROM fecha_pago)
+                ORDER BY anio DESC
+            """)
+            
+            anios = []
+            for row in cursor.fetchall():
+                anios.append({
+                    'anio': int(row[0]),
+                    'total_pagos': row[1],
+                    'total_recaudado': float(row[2]),
+                    'clientes_activos': row[3],
+                    'promedio_pago': float(row[4])
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'anios': anios,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_clientes_estado(request):
+    """Reporte de clientes por estado de pago"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    estado_pago,
+                    COUNT(*) as total_clientes,
+                    COALESCE(SUM(monto_total_deuda), 0) as deuda_total,
+                    COALESCE(SUM(total_pagado), 0) as pagado_total,
+                    COALESCE(AVG(meses_pendientes), 0) as meses_promedio
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+                GROUP BY estado_pago
+                ORDER BY deuda_total DESC
+            """)
+            
+            estados = []
+            for row in cursor.fetchall():
+                estados.append({
+                    'estado_pago': row[0],
+                    'total_clientes': row[1],
+                    'deuda_total': float(row[2]),
+                    'pagado_total': float(row[3]),
+                    'meses_promedio': float(row[4])
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'estados': estados,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_morosidad(request):
+    """Reporte de morosidad del sistema"""
+    try:
+        with connection.cursor() as cursor:
+            # Clientes vencidos
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_vencidos,
+                    COALESCE(SUM(monto_total_deuda), 0) as deuda_vencida,
+                    COALESCE(AVG(meses_pendientes), 0) as meses_promedio
+                FROM clientes_deuda
+                WHERE estado = 'activo' AND estado_pago = 'vencido'
+            """)
+            
+            vencidos = cursor.fetchone()
+            
+            # Distribución por meses de mora
+            cursor.execute("""
+                SELECT 
+                    meses_pendientes,
+                    COUNT(*) as cantidad_clientes,
+                    COALESCE(SUM(monto_total_deuda), 0) as deuda_total
+                FROM clientes_deuda
+                WHERE estado = 'activo' AND estado_pago = 'vencido'
+                GROUP BY meses_pendientes
+                ORDER BY meses_pendientes DESC
+            """)
+            
+            distribucion_meses = []
+            for row in cursor.fetchall():
+                distribucion_meses.append({
+                    'meses_pendientes': row[0],
+                    'cantidad_clientes': row[1],
+                    'deuda_total': float(row[2])
+                })
+            
+        return Response({
+            'success': True,
+            'data': {
+                'resumen_vencidos': {
+                    'total_vencidos': vencidos[0],
+                    'deuda_vencida': float(vencidos[1]),
+                    'meses_promedio': float(vencidos[2])
+                },
+                'distribucion_meses': distribucion_meses,
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_eficiencia_cobranza(request):
+    """Reporte de eficiencia en cobranza"""
+    try:
+        with connection.cursor() as cursor:
+            # Eficiencia general
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_clientes,
+                    COUNT(CASE WHEN estado_pago = 'al_dia' THEN 1 END) as al_dia,
+                    COUNT(CASE WHEN estado_pago IN ('vencido', 'pendiente') THEN 1 END) as con_deuda,
+                    COALESCE(SUM(total_pagado), 0) as total_recaudado,
+                    COALESCE(SUM(monto_total_deuda), 0) as total_deuda
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+            """)
+            
+            eficiencia = cursor.fetchone()
+            
+            # Calcular porcentajes
+            total_clientes = eficiencia[0]
+            al_dia = eficiencia[1]
+            con_deuda = eficiencia[2]
+            
+            porcentaje_al_dia = (al_dia / total_clientes * 100) if total_clientes > 0 else 0
+            porcentaje_con_deuda = (con_deuda / total_clientes * 100) if total_clientes > 0 else 0
+            
+            # Calcular porcentaje cobrado
+            total_recaudado = float(eficiencia[3])
+            total_deuda = float(eficiencia[4])
+            porcentaje_cobrado = 0
+            if (total_recaudado + total_deuda) > 0:
+                porcentaje_cobrado = round((total_recaudado / (total_recaudado + total_deuda)) * 100, 2)
+            
+        return Response({
+            'success': True,
+            'data': {
+                'eficiencia_general': {
+                    'total_clientes': total_clientes,
+                    'al_dia': al_dia,
+                    'con_deuda': con_deuda,
+                    'porcentaje_al_dia': round(porcentaje_al_dia, 2),
+                    'porcentaje_con_deuda': round(porcentaje_con_deuda, 2)
+                },
+                'recaudacion': {
+                    'total_recaudado': total_recaudado,
+                    'total_deuda': total_deuda,
+                    'porcentaje_cobrado': porcentaje_cobrado
+                },
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def reporte_proyecciones(request):
+    """Reporte de proyecciones futuras"""
+    try:
+        with connection.cursor() as cursor:
+            # Proyección de recaudación basada en clientes activos
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_clientes,
+                    COALESCE(SUM(precio_plan), 0) as recaudacion_mensual_potencial,
+                    COALESCE(AVG(precio_plan), 0) as promedio_plan
+                FROM clientes_deuda
+                WHERE estado = 'activo'
+            """)
+            
+            proyeccion = cursor.fetchone()
+            
+            # Calcular proyecciones
+            recaudacion_mensual = float(proyeccion[1])
+            proyeccion_3_meses = recaudacion_mensual * 3
+            proyeccion_6_meses = recaudacion_mensual * 6
+            proyeccion_12_meses = recaudacion_mensual * 12
+            
+        return Response({
+            'success': True,
+            'data': {
+                'proyecciones': {
+                    'total_clientes': proyeccion[0],
+                    'recaudacion_mensual_potencial': recaudacion_mensual,
+                    'promedio_plan': float(proyeccion[2]),
+                    'proyeccion_3_meses': proyeccion_3_meses,
+                    'proyeccion_6_meses': proyeccion_6_meses,
+                    'proyeccion_12_meses': proyeccion_12_meses
+                },
+                'fecha_generacion': datetime.now().isoformat()
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def exportar_reporte_excel(request):
+    """Exportar reporte a Excel (placeholder)"""
+    return Response({
+        'success': True,
+        'message': 'Función de exportación a Excel en desarrollo',
+        'data': {
+            'formato': 'Excel (.xlsx)',
+            'estado': 'En desarrollo'
+        }
+    }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def exportar_reporte_pdf(request):
+    """Exportar reporte a PDF (placeholder)"""
+    return Response({
+        'success': True,
+        'message': 'Función de exportación a PDF en desarrollo',
+        'data': {
+            'formato': 'PDF',
+            'estado': 'En desarrollo'
+        }
+    }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def pagos_reales(request):
+    """Obtener pagos reales para el reporte de pagos"""
+    try:
+        year = request.GET.get('year', datetime.now().year)
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    p.id, p.numero_comprobante, p.fecha_pago, 
+                    cd.nombres || ' ' || cd.apellidos as cliente_nombre,
+                    cd.cedula as cliente_cedula,
+                    cd.tipo_plan, p.concepto, p.metodo_pago, p.monto, p.estado,
+                    p.comprobante_enviado
+                FROM pagos p
+                JOIN clientes_deuda cd ON p.cliente_id = cd.id
+                WHERE EXTRACT(YEAR FROM p.fecha_pago) = %s
+                ORDER BY p.fecha_pago DESC
+            """, [year])
+            
+            pagos = []
+            for row in cursor.fetchall():
+                pagos.append({
+                    'id': row[0],
+                    'numero_comprobante': row[1],
+                    'fecha_pago': row[2].isoformat() if row[2] else None,
+                    'cliente_nombre': row[3],
+                    'cliente_cedula': row[4],
+                    'tipo_plan': row[5],
+                    'concepto': row[6],
+                    'metodo_pago': row[7],
+                    'monto': float(row[8]),
+                    'estado': row[9],
+                    'comprobante_enviado': row[10]
+                })
+        
+        return Response({
+            'success': True,
+            'pagos': pagos,
+            'total_pagos': len(pagos),
+            'total_monto': sum(p['monto'] for p in pagos)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al obtener pagos reales: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def gastos_reales(request):
+    """Obtener gastos reales para el reporte de gastos"""
+    try:
+        year = request.GET.get('year', datetime.now().year)
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    g.id, g.fecha_gasto, g.descripcion, g.categoria, g.monto,
+                    g.proveedor, g.metodo_pago, u.nombre as usuario_nombre
+                FROM gastos g
+                LEFT JOIN usuarios u ON g.usuario_id = u.id
+                WHERE EXTRACT(YEAR FROM g.fecha_gasto) = %s
+                ORDER BY g.fecha_gasto DESC
+            """, [year])
+            
+            gastos = []
+            for row in cursor.fetchall():
+                gastos.append({
+                    'id': row[0],
+                    'fecha_gasto': row[1].isoformat() if row[1] else None,
+                    'descripcion': row[2],
+                    'categoria': row[3],
+                    'monto': float(row[4]),
+                    'proveedor': row[5],
+                    'metodo_pago': row[6],
+                    'usuario_nombre': row[7] or 'Sistema'
+                })
+        
+        return Response({
+            'success': True,
+            'gastos': gastos,
+            'total_gastos': len(gastos),
+            'total_monto': sum(g['monto'] for g in gastos)
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al obtener gastos reales: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def descargar_reporte_excel(request):
+    """Descargar reporte completo en Excel"""
+    try:
+        import os
+        from django.http import FileResponse
+        import glob
+        
+        # Buscar el archivo más reciente
+        reportes_path = os.path.join(os.path.dirname(__file__), '..')
+        archivos = glob.glob(os.path.join(reportes_path, 'reporte_completo_*.xlsx'))
+        
+        if not archivos:
+            return Response({
+                'success': False,
+                'message': 'No se encontraron reportes generados'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Obtener el archivo más reciente
+        archivo_mas_reciente = max(archivos, key=os.path.getctime)
+        
+        # Crear respuesta de archivo
+        response = FileResponse(
+            open(archivo_mas_reciente, 'rb'),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(archivo_mas_reciente)}"'
+        
+        return response
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al descargar el archivo: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def descargar_reporte_detallado_excel(request):
+    """Descargar reporte detallado en Excel"""
+    try:
+        import os
+        from django.http import FileResponse
+        import glob
+        
+        # Buscar el archivo más reciente
+        reportes_path = os.path.join(os.path.dirname(__file__), '..')
+        archivos = glob.glob(os.path.join(reportes_path, 'reporte_detallado_*.xlsx'))
+        
+        if not archivos:
+            return Response({
+                'success': False,
+                'message': 'No se encontraron reportes detallados generados'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Obtener el archivo más reciente
+        archivo_mas_reciente = max(archivos, key=os.path.getctime)
+        
+        # Crear respuesta de archivo
+        response = FileResponse(
+            open(archivo_mas_reciente, 'rb'),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(archivo_mas_reciente)}"'
+        
+        return response
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al descargar el archivo: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, Mail } from "lucide-react"
 import Link from "next/link"
+import { API_ENDPOINTS } from "@/lib/config/api"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -19,7 +20,7 @@ export default function ForgotPasswordPage() {
     setMessage(null)
 
     try {
-      const res = await fetch("http://localhost:8000/api/auth/forgot/", {
+      const res = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

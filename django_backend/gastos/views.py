@@ -336,4 +336,225 @@ def get_gasto_stats(request):
         return Response({
             'success': False,
             'message': f'Error en el servidor: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_gasto_tendencias(request):
+    """Obtener tendencias de gastos de los últimos 6 meses"""
+    try:
+        meses = int(request.GET.get('meses', 6))
+        if meses > 12:
+            meses = 12
+            
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    TO_CHAR(fecha_gasto, 'YYYY-MM') as mes,
+                    TO_CHAR(fecha_gasto, 'YYYY') as año,
+                    TO_CHAR(fecha_gasto, 'TMMonth') as nombre_mes,
+                    COUNT(*) as cantidad,
+                    COALESCE(SUM(monto), 0) as total
+                FROM gastos
+                WHERE fecha_gasto >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '%s months'
+                GROUP BY TO_CHAR(fecha_gasto, 'YYYY-MM'), TO_CHAR(fecha_gasto, 'YYYY'), TO_CHAR(fecha_gasto, 'TMMonth')
+                ORDER BY mes ASC
+            """, [meses])
+            
+            tendencias = []
+            for row in cursor.fetchall():
+                tendencias.append({
+                    'mes': row[0],
+                    'año': row[1],
+                    'nombre_mes': row[2],
+                    'cantidad': row[3],
+                    'total': float(row[4])
+                })
+            
+            # Obtener gastos por categoría por mes
+            cursor.execute("""
+                SELECT 
+                    TO_CHAR(fecha_gasto, 'YYYY-MM') as mes,
+                    categoria,
+                    COALESCE(SUM(monto), 0) as total
+                FROM gastos
+                WHERE fecha_gasto >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '%s months'
+                GROUP BY TO_CHAR(fecha_gasto, 'YYYY-MM'), categoria
+                ORDER BY mes ASC, total DESC
+            """, [meses])
+            
+            categorias_por_mes = {}
+            for row in cursor.fetchall():
+                mes = row[0]
+                cat = row[1]
+                total = float(row[2])
+                if mes not in categorias_por_mes:
+                    categorias_por_mes[mes] = []
+                categorias_por_mes[mes].append({
+                    'categoria': cat,
+                    'total': total
+                })
+            
+            # Mes actual vs mes anterior
+            cursor.execute("""
+                SELECT 
+                    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', fecha_gasto) = DATE_TRUNC('month', CURRENT_DATE) THEN monto END), 0) as mes_actual,
+                    COALESCE(SUM(CASE WHEN DATE_TRUNC('month', fecha_gasto) = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' THEN monto END), 0) as mes_anterior
+                FROM gastos
+                WHERE fecha_gasto >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '2 months'
+            """)
+            row = cursor.fetchone()
+            mes_actual = float(row[0]) if row[0] else 0
+            mes_anterior = float(row[1]) if row[1] else 0
+            
+            diferencia = mes_actual - mes_anterior
+            porcentaje_cambio = ((diferencia / mes_anterior) * 100) if mes_anterior > 0 else 0
+            
+            # Top 5 categorías del mes actual
+            cursor.execute("""
+                SELECT categoria, COALESCE(SUM(monto), 0) as total
+                FROM gastos
+                WHERE DATE_TRUNC('month', fecha_gasto) = DATE_TRUNC('month', CURRENT_DATE)
+                GROUP BY categoria
+                ORDER BY total DESC
+                LIMIT 5
+            """)
+            top_categorias = []
+            for row in cursor.fetchall():
+                top_categorias.append({
+                    'categoria': row[0],
+                    'total': float(row[1])
+                })
+        
+        return Response({
+            'success': True,
+            'data': {
+                'tendencias': tendencias,
+                'categorias_por_mes': categorias_por_mes,
+                'mes_actual': mes_actual,
+                'mes_anterior': mes_anterior,
+                'diferencia': diferencia,
+                'porcentaje_cambio': round(porcentaje_cambio, 2),
+                'top_categorias': top_categorias
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_balance_mensual(request):
+    """Obtener balance mensual de ingresos vs gastos"""
+    try:
+        # Obtener mes y año (default: actual)
+        año = request.GET.get('año')
+        mes = request.GET.get('mes')
+        
+        if not año or not mes:
+            from datetime import datetime
+            now = datetime.now()
+            año = str(now.year)
+            mes = str(now.month).zfill(2)
+        
+        # Ingresos (pagos) del mes
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT COALESCE(SUM(monto), 0), COUNT(*)
+                FROM pagos
+                WHERE TO_CHAR(fecha_pago, 'YYYY-MM') = %s
+                AND estado = 'completado'
+            """, [f'{año}-{mes}'])
+            row = cursor.fetchone()
+            ingresos = float(row[0]) if row[0] else 0
+            num_ingresos = row[1] if row[1] else 0
+            
+            # Gastos del mes
+            cursor.execute("""
+                SELECT COALESCE(SUM(monto), 0), COUNT(*)
+                FROM gastos
+                WHERE TO_CHAR(fecha_gasto, 'YYYY-MM') = %s
+            """, [f'{año}-{mes}'])
+            row = cursor.fetchone()
+            gastos = float(row[0]) if row[0] else 0
+            num_gastos = row[1] if row[1] else 0
+            
+            # Balance
+            balance = ingresos - gastos
+            rentabilidad = ((balance / ingresos) * 100) if ingresos > 0 else 0
+            
+            # Mes anterior para comparación
+            cursor.execute("""
+                SELECT 
+                    COALESCE(SUM(CASE WHEN 'pagos' = 'pagos' THEN monto END), 0),
+                    COALESCE(SUM(CASE WHEN 'gastos' = 'gastos' THEN monto END), 0)
+                FROM (
+                    SELECT monto, 'pagos' as tipo FROM pagos WHERE TO_CHAR(fecha_pago, 'YYYY-MM') = %s AND estado = 'completado'
+                    UNION ALL
+                    SELECT monto, 'gastos' as tipo FROM gastos WHERE TO_LE_CHAR(fecha_gasto, 'YYYY-MM') = %s
+                ) as t
+            """, [f'{int(año)}-{int(mes)-1:02d}', f'{int(año)}-{int(mes)-1:02d}'])
+            
+            # Historial últimos 6 meses
+            cursor.execute("""
+                SELECT 
+                    TO_CHAR(mes, 'YYYY-MM') as mes,
+                    TO_CHAR(mes, 'TMMonth') as nombre_mes,
+                    COALESCE(ingresos, 0) as ingresos,
+                    COALESCE(gastos, 0) as gastos,
+                    COALESCE(ingresos, 0) - COALESCE(gastos, 0) as balance
+                FROM (
+                    SELECT DATE_TRUNC('month', fecha_pago) as mes
+                    FROM pagos
+                    WHERE fecha_pago >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '6 months'
+                    AND estado = 'completado'
+                    GROUP BY DATE_TRUNC('month', fecha_pago)
+                ) as meses
+                LEFT JOIN LATERAL (
+                    SELECT SUM(monto) as ingresos
+                    FROM pagos
+                    WHERE DATE_TRUNC('month', fecha_pago) = meses.mes AND estado = 'completado'
+                ) p ON true
+                LEFT JOIN LATERAL (
+                    SELECT SUM(monto) as gastos
+                    FROM gastos
+                    WHERE DATE_TRUNC('month', fecha_gasto) = meses.mes
+                ) g ON true
+                ORDER BY mes ASC
+            """)
+            
+            historial = []
+            for row in cursor.fetchall():
+                historial.append({
+                    'mes': row[0],
+                    'nombre_mes': row[1],
+                    'ingresos': float(row[2]) if row[2] else 0,
+                    'gastos': float(row[3]) if row[3] else 0,
+                    'balance': float(row[4]) if row[4] else 0
+                })
+        
+        return Response({
+            'success': True,
+            'data': {
+                'año': int(año),
+                'mes': int(mes),
+                'ingresos': ingresos,
+                'num_ingresos': num_ingresos,
+                'gastos': gastos,
+                'num_gastos': num_gastos,
+                'balance': balance,
+                'rentabilidad': round(rentabilidad, 2),
+                'historial': historial
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'success': False,
+            'message': f'Error en el servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

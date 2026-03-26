@@ -3,7 +3,10 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { getCurrentUser, logoutUser } from "@/lib/config/api"
+import { getCurrentUser, logoutUser, API_ENDPOINTS, apiRequest } from "@/lib/config/api"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { LogOut } from "lucide-react"
 
 interface User {
   id: string | null
@@ -25,17 +28,106 @@ interface DashboardStats {
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats>({
-    totalClientes: 1234,
-    clientesActivos: 1180,
-    recaudacionMensual: 45231,
-    pagosPendientes: 23,
-    gastosDelMes: 8500,
-    notificacionesPendientes: 12,
-    serviciosActivos: 1180,
-    morosidad: 4.2,
+    totalClientes: 0,
+    clientesActivos: 0,
+    recaudacionMensual: 0,
+    pagosPendientes: 0,
+    gastosDelMes: 0,
+    notificacionesPendientes: 0,
+    serviciosActivos: 0,
+    morosidad: 0,
   })
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
+  const [userInfo, setUserInfo] = useState<{email: string; ultimo_ingreso?: string} | null>(null)
   const router = useRouter()
+
+  // Cargar estadísticas del dashboard
+  const loadDashboardStats = async () => {
+    try {
+      setLoading(true)
+      
+      // Cargar estadísticas en paralelo
+      const [clientesStats, pagosStats, notificacionesStats, deudasStats] = await Promise.allSettled([
+        apiRequest(API_ENDPOINTS.CLIENTES_ESTADISTICAS),
+        apiRequest(API_ENDPOINTS.PAGOS_STATS),
+        apiRequest(API_ENDPOINTS.NOTIFICACIONES_ESTADISTICAS),
+        apiRequest(API_ENDPOINTS.DEUDAS_STATS).catch(() => ({ success: false, data: {} }))
+      ])
+
+      // Procesar estadísticas de clientes
+      let totalClientes = 0
+      let clientesActivos = 0
+      if (clientesStats.status === 'fulfilled' && clientesStats.value.success) {
+        const data = clientesStats.value.data
+        totalClientes = data.total_clientes || 0
+        clientesActivos = data.clientes_activos || 0
+      }
+
+      // Procesar estadísticas de pagos
+      let recaudacionMensual = 0
+      let comprobantesPendientes = 0
+      if (pagosStats.status === 'fulfilled' && pagosStats.value.success) {
+        const data = pagosStats.value.data
+        recaudacionMensual = data.recaudacion_mes_actual || 0
+        comprobantesPendientes = data.comprobantes_pendientes || 0
+      }
+
+      // Procesar estadísticas de notificaciones
+      let notificacionesPendientes = 0
+      if (notificacionesStats.status === 'fulfilled' && notificacionesStats.value.success) {
+        const data = notificacionesStats.value.data
+        notificacionesPendientes = data.pendientes || 0
+      }
+
+      // Calcular gastos del mes
+      let gastosDelMes = 0
+      try {
+        const gastosResponse = await fetch(API_ENDPOINTS.GASTOS)
+        if (gastosResponse.ok) {
+          const gastosData = await gastosResponse.json()
+          if (gastosData.success && Array.isArray(gastosData.data)) {
+            const mesActual = new Date().getMonth() + 1
+            const anioActual = new Date().getFullYear()
+            gastosDelMes = gastosData.data
+              .filter((gasto: any) => {
+                if (!gasto.fecha_gasto) return false
+                const fecha = new Date(gasto.fecha_gasto)
+                return fecha.getMonth() + 1 === mesActual && fecha.getFullYear() === anioActual
+              })
+              .reduce((sum: number, gasto: any) => sum + (parseFloat(gasto.monto) || 0), 0)
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando gastos:', error)
+      }
+
+      // Calcular morosidad (porcentaje de clientes con deuda)
+      let morosidad = 0
+      if (deudasStats.status === 'fulfilled' && deudasStats.value.success) {
+        const data = deudasStats.value.data
+        const totalDeudores = data.clientes_por_estado?.find((e: any) => e.estado === 'vencido')?.cantidad || 0
+        morosidad = clientesActivos > 0 ? (totalDeudores / clientesActivos) * 100 : 0
+      }
+
+      setStats({
+        totalClientes,
+        clientesActivos,
+        recaudacionMensual,
+        pagosPendientes: comprobantesPendientes,
+        gastosDelMes,
+        notificacionesPendientes,
+        serviciosActivos: clientesActivos, // Los servicios activos son igual a clientes activos
+        morosidad: parseFloat(morosidad.toFixed(2))
+      })
+    } catch (error) {
+      console.error('Error cargando estadísticas del dashboard:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const currentUser = getCurrentUser()
@@ -44,12 +136,55 @@ export default function Dashboard() {
       return
     }
     setUser(currentUser)
+    loadDashboardStats()
   }, [router])
 
   const handleLogout = () => {
+    setShowUserMenu(false)
+    setShowLogoutDialog(true)
+  }
+
+  const confirmLogout = () => {
     logoutUser()
     router.push("/")
   }
+
+  const handleProfile = () => {
+    setShowUserMenu(false)
+    router.push("/perfil")
+  }
+
+  const handleSettings = () => {
+    setShowUserMenu(false)
+    router.push("/configuracion")
+  }
+
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showUserMenu) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener("click", handleClickOutside)
+    return () => document.removeEventListener("click", handleClickOutside)
+  }, [showUserMenu])
+
+  // Heartbeat para mantener la sesión activa (cada 10 minutos)
+  useEffect(() => {
+    const heartbeat = setInterval(async () => {
+      const userEmail = localStorage.getItem('userEmail')
+      if (userEmail) {
+        try {
+          await apiRequest(API_ENDPOINTS.USER_INFO + `?email=${encodeURIComponent(userEmail)}`)
+        } catch (error) {
+          console.error('Heartbeat error:', error)
+        }
+      }
+    }, 10 * 60 * 1000) // 10 minutos
+
+    return () => clearInterval(heartbeat)
+  }, [])
 
   if (!user) return null
 
@@ -116,14 +251,6 @@ export default function Dashboard() {
             color: "linear-gradient(135deg, #f59e0b, #f97316)",
             stats: `${stats.notificacionesPendientes} pendientes`,
             icon: "💬",
-          },
-          {
-            name: "Sitio Web",
-            href: "/sitio-web",
-            description: "Gestión del sitio web público",
-            color: "linear-gradient(135deg, #06b6d4, #3b82f6)",
-            stats: "Contenido dinámico",
-            icon: "🌐",
           },
         ]
       case "economia":
@@ -273,44 +400,128 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <button
-                style={{
-                  background: "none",
-                  border: "none",
-                  position: "relative",
-                  cursor: "pointer",
-                  padding: "0.5rem",
-                }}
-              >
-                <div className="relative flex items-center space-x-2">
-                  {/* Ícono de usuario */}
-                  <span className="text-2xl">👤</span>
-                </div>
-              </button>
-              <div style={{ textAlign: "right" }}>
-                <p style={{ fontSize: "0.875rem", fontWeight: "500", color: "#0f172a" }}>{user.nombre || "Usuario"}</p>
-                <p style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "capitalize" }}>
-                  {(user.rol || "").replace("_", " ")}
-                </p>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
+              {/* Menú de usuario */}
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "0.25rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                  }}
+                >
+                  {/* Avatar con iniciales */}
+                  <div style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, #3b82f6, #06b6d4)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "white",
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                  }}>
+                    {user.nombre ? user.nombre.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase() : "U"}
+                  </div>
+                  <div style={{ textAlign: "left" }}>
+                    <p style={{ fontSize: "0.875rem", fontWeight: "500", color: "#0f172a" }}>{user.nombre || "Usuario"}</p>
+                    <p style={{ fontSize: "0.75rem", color: "#64748b", textTransform: "capitalize" }}>
+                      {(user.rol || "").replace("_", " ")}
+                    </p>
+                  </div>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginLeft: "0.25rem" }}>
+                    <path d="M3 4.5L6 7.5L9 4.5" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                
+                {/* Dropdown menu */}
+                {showUserMenu && (
+                  <div style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: "0.5rem",
+                    background: "white",
+                    borderRadius: "0.5rem",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                    minWidth: "180px",
+                    zIndex: 50,
+                    overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={handleProfile}
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        border: "none",
+                        background: "none",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        fontSize: "0.875rem",
+                        color: "#374151",
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span>👤</span>
+                      <span>Mi Perfil</span>
+                    </button>
+                    <button
+                      onClick={handleSettings}
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        border: "none",
+                        background: "none",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        fontSize: "0.875rem",
+                        color: "#374151",
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span>⚙️</span>
+                      <span>Configuración</span>
+                    </button>
+                    <div style={{ borderTop: "1px solid #e5e7eb", margin: "0.25rem 0" }}></div>
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        border: "none",
+                        background: "none",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        fontSize: "0.875rem",
+                        color: "#dc2626",
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.background = "#fee2e2"}
+                      onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span>🚪</span>
+                      <span>Salir</span>
+                    </button>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  border: "1px solid #e2e8f0",
-                  background: "white",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.5rem",
-                  cursor: "pointer",
-                  fontSize: "0.875rem",
-                }}
-              >
-                <span>🚪</span>
-                <span>Salir</span>
-              </button>
             </div>
           </div>
         </div>
@@ -342,27 +553,7 @@ export default function Dashboard() {
               day: "numeric",
             })}
           </p>
-          {/* Botón de configuración solo para administradores, debajo de bienvenida y a la derecha */}
-          {user.rol === "administrador" && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "2rem" }}>
-                      <button
-                        onClick={() => router.push("/configuracion")}
-                        style={{
-                          background: "linear-gradient(90deg, #6366f1, #06b6d4)",
-                          color: "white",
-                          padding: "0.5rem 1.5rem",
-                          borderRadius: "0.5rem",
-                          border: "none",
-                          fontWeight: 600,
-                          fontSize: "1rem",
-                          cursor: "pointer",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                        }}
-                      >
-                        ⚙️ Configuración
-                      </button>
-                    </div>
-                  )}
+
         </div>
 
        
@@ -430,7 +621,7 @@ export default function Dashboard() {
                       borderRadius: "0.25rem",
                     }}
                   >
-                    {module.stats}
+                    {loading ? "Cargando..." : module.stats}
                   </span>
                 </div>
                 <h4 style={{ fontSize: "1.125rem", fontWeight: "600", color: "#0f172a", marginBottom: "0.5rem" }}>
@@ -542,6 +733,41 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Dialog de confirmación de logout */}
+        <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <LogOut className="h-5 w-5 text-red-600" />
+                </div>
+                Salir del Sistema
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-slate-600">
+                ¿Estás seguro de que quieres cerrar sesión? Tendrás que iniciar sesión nuevamente para acceder al sistema.
+              </p>
+            </div>
+            <DialogFooter className="sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowLogoutDialog(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmLogout}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Salir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

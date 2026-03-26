@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { API_ENDPOINTS } from "@/lib/config/api"
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function ResetPasswordPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await fetch("http://localhost:8000/api/auth/reset/", {
+      const res = await fetch(API_ENDPOINTS.RESET_PASSWORD, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, newPassword }),

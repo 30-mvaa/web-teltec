@@ -264,29 +264,34 @@ class ClienteService:
                     if cursor.fetchone():
                         return False, "La cédula ya está registrada"
             
-            # Construir query de actualización
+            # Construir query de actualización con validación de columnas
             updates = []
             params = []
             
-            campos = ['cedula', 'nombres', 'apellidos', 'tipo_plan', 'precio_plan',
+            # Whitelist de columnas permitidas para prevenir SQL injection
+            allowed_columns = {
+                'cedula', 'nombres', 'apellidos', 'tipo_plan', 'precio_plan',
                      'fecha_nacimiento', 'direccion', 'sector', 'email', 'telefono',
-                     'telegram_chat_id', 'estado']
+                'telegram_chat_id', 'estado', 'id_sector'
+            }
             
-            for campo in campos:
-                if campo in datos:
+            for campo, valor in datos.items():
+                # Validar que el campo esté en la whitelist
+                if campo in allowed_columns:
                     updates.append(f"{campo} = %s")
-                    params.append(datos[campo])
+                    params.append(valor)
             
             if not updates:
                 return False, "No hay campos para actualizar"
             
-            updates.append("fecha_actualizacion = NOW()")
             params.append(cliente_id)
             
             with connection.cursor() as cursor:
+                # Construir query de forma segura
+                set_clause = ', '.join(updates)
                 cursor.execute(f"""
                     UPDATE clientes 
-                    SET {', '.join(updates)}
+                    SET {set_clause}, fecha_actualizacion = NOW()
                     WHERE id = %s
                 """, params)
             

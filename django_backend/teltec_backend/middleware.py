@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from django.db import connection
+from django.utils import timezone
 import json
 
 
@@ -25,6 +26,7 @@ class SimpleAuthMiddleware:
             '/api/notificaciones/',
             '/api/reportes/',
             '/api/gastos/',
+            '/api/sitio-web/',  # Rutas públicas del sitio web
             '/admin/',
             '/admin/login/',
             '/',
@@ -34,8 +36,8 @@ class SimpleAuthMiddleware:
         if any(request.path.startswith(path) for path in public_paths):
             return self.get_response(request)
         
-        # Para APIs, verificar autenticación
-        if request.path.startswith('/api/'):
+        # Para APIs, verificar autenticación solo si no es una ruta pública
+        if request.path.startswith('/api/') and not any(request.path.startswith(path) for path in public_paths):
             # Obtener email del header o query params
             email = request.headers.get('X-User-Email') or request.GET.get('email')
             
@@ -49,7 +51,7 @@ class SimpleAuthMiddleware:
             try:
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        SELECT id, email, nombre, rol, activo 
+                        SELECT id, email, nombre, rol, activo, last_activity, session_timeout_minutes
                         FROM usuarios 
                         WHERE email = %s AND activo = true
                     """, [email])
@@ -61,14 +63,30 @@ class SimpleAuthMiddleware:
                         'message': 'Usuario no encontrado o inactivo'
                     }, status=401)
                 
+                # Verificar timeout de sesión
+                user_id, user_email, nombre, rol, activo, last_activity, session_timeout = user_data
+                if last_activity:
+                    timeout_minutes = session_timeout if session_timeout else 30
+                    if timezone.now() > last_activity + timezone.timedelta(minutes=timeout_minutes):
+                        return JsonResponse({
+                            'success': False,
+                            'message': 'Sesión expirada por inactividad. Por favor, inicie sesión nuevamente.'
+                        }, status=401)
+                
+                # Actualizar last_activity
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        UPDATE usuarios SET last_activity = %s WHERE email = %s
+                    """, [timezone.now(), email])
+                
                 # Agregar información del usuario a la request
                 request.user_email = email
                 request.user_data = {
-                    'id': user_data[0],
-                    'email': user_data[1],
-                    'nombre': user_data[2],
-                    'rol': user_data[3],
-                    'activo': user_data[4]
+                    'id': user_id,
+                    'email': user_email,
+                    'nombre': nombre,
+                    'rol': rol,
+                    'activo': activo
                 }
                 
             except Exception as e:

@@ -13,11 +13,21 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import sys
 
 # Cargar variables de entorno desde .env.local (si existe)
 load_dotenv('../.env.local', override=True)
 # También cargar desde .env si existe
 load_dotenv('../.env', override=True)
+
+# Configurar variables de entorno para WeasyPrint en macOS
+# Esto es necesario para que WeasyPrint encuentre las librerías del sistema
+if sys.platform == 'darwin':  # macOS
+    homebrew_prefix = '/opt/homebrew'
+    if os.path.exists(homebrew_prefix):
+        os.environ.setdefault('PKG_CONFIG_PATH', f'{homebrew_prefix}/lib/pkgconfig')
+        os.environ.setdefault('DYLD_LIBRARY_PATH', f'{homebrew_prefix}/lib')
+        os.environ.setdefault('PATH', f'{homebrew_prefix}/bin:{os.environ.get("PATH", "")}')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,12 +37,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-your-secret-key-here'
+# Usar variable de entorno o valor por defecto solo para desarrollo
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-secret-key-here-CHANGE-IN-PRODUCTION')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG solo True en desarrollo, usar variable de entorno en producción
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+# ALLOWED_HOSTS - usar variable de entorno en producción, valores por defecto para desarrollo
+if DEBUG:
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'host.docker.internal']
+else:
+    allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
+    ALLOWED_HOSTS = allowed_hosts.split(',') if allowed_hosts else []
 
 
 # Application definition
@@ -54,6 +71,11 @@ INSTALLED_APPS = [
     'sitio_web',
     'reportes_app',
     'configuracion',
+    'sectores_app',
+    'planes_app',
+    'clientes_planes_app',
+    'deudas',
+    'chatbot',
 ]
 
 MIDDLEWARE = [
@@ -95,11 +117,11 @@ WSGI_APPLICATION = 'teltec_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'teltec_db',
-        'USER': 'teltec_user',
-        'PASSWORD': '12345678',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'teltec_db'),
+        'USER': os.environ.get('DB_USER', 'teltec_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', '12345678'),  # Cambiar en producción
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
@@ -186,7 +208,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Permitir solicitudes desde archivos locales para desarrollo
-CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo
+# IMPORTANTE: En producción, CORS_ALLOW_ALL_ORIGINS debe ser False
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Solo True en desarrollo
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuración adicional de CORS para desarrollo

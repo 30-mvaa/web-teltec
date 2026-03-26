@@ -12,10 +12,14 @@ urlpatterns = [
     path('api/configuracion/planes/crear/', views.crear_plan, name='crear_plan'),
     path('api/configuracion/planes/<int:plan_id>/actualizar/', views.actualizar_plan, name='actualizar_plan'),
     path('api/configuracion/planes/<int:plan_id>/eliminar/', views.eliminar_plan, name='eliminar_plan'),
+    path('api/configuracion/planes/<int:plan_id>/desactivar/', views.desactivar_plan, name='desactivar_plan'),
+    path('api/configuracion/planes/<int:plan_id>/activar/', views.activar_plan, name='activar_plan'),
     
     # Gestión de sectores
     path('api/configuracion/sectores/', views.listar_sectores, name='listar_sectores'),
     path('api/configuracion/sectores/crear/', views.crear_sector, name='crear_sector'),
     path('api/configuracion/sectores/<int:sector_id>/actualizar/', views.actualizar_sector, name='actualizar_sector'),
     path('api/configuracion/sectores/<int:sector_id>/eliminar/', views.eliminar_sector, name='eliminar_sector'),
+    path('api/configuracion/sectores/<int:sector_id>/desactivar/', views.desactivar_sector, name='desactivar_sector'),
+    path('api/configuracion/sectores/<int:sector_id>/activar/', views.activar_sector, name='activar_sector'),
 ]

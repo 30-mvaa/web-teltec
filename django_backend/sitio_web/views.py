@@ -6,9 +6,12 @@ from django.views import View
 import json
 from .models import (
     InformacionSitio, Empresa, Servicio, RedSocial, ConfiguracionSitio,
-    Plan, Cobertura, Contacto, Carrusel, Header, Footer
+    Cobertura, Contacto, Carrusel, Header, Footer, SolicitudInstalacion
 )
+from planes_app.models import Plan
+from sectores_app.models import Sector
 from django.db import transaction
+from django.db.models import Q
 
 def get_user_from_request(request):
     """Obtener información del usuario desde los headers"""
@@ -16,15 +19,24 @@ def get_user_from_request(request):
     if not user_email:
         return None
     
-    # Aquí podrías verificar contra el modelo de usuarios si es necesario
-    return {'email': user_email}
+    # Verificar que el usuario existe en la base de datos
+    try:
+        from usuarios.models import Usuario
+        usuario = Usuario.objects.get(email=user_email, activo=True)
+        return {
+            'email': user_email,
+            'rol': usuario.rol,
+            'id': usuario.id
+        }
+    except:
+        return None
 
 def check_admin_permissions(user):
     """Verificar que el usuario sea administrador"""
     if not user:
         return False
-    # Aquí podrías verificar el rol del usuario
-    return True
+    # Verificar que el usuario sea administrador
+    return user.get('rol') == 'administrador'
 
 @csrf_exempt
 @require_http_methods(["GET", "PUT"])
@@ -64,7 +76,7 @@ def configuracion_sitio_web(request):
             servicios = list(Servicio.objects.filter(activo=True).values('id', 'nombre', 'descripcion', 'icono', 'imagen', 'activo', 'orden'))
             
             # Obtener planes
-            planes = list(Plan.objects.filter(activo=True).values('id', 'nombre', 'velocidad', 'precio', 'descripcion', 'caracteristicas', 'popular', 'activo', 'orden'))
+            planes = list(Plan.objects.filter(estado='activo').values('id', 'tipo_plan', 'precio', 'descripcion'))
             
             # Obtener coberturas
             coberturas = list(Cobertura.objects.filter(activo=True).values('id', 'zona', 'descripcion', 'coordenadas', 'activo', 'orden'))
@@ -132,6 +144,7 @@ def configuracion_sitio_web(request):
                 },
                 'servicios': servicios,
                 'planes': planes,
+                'sectores': list(Sector.objects.filter(estado='activo').values('id', 'nombre_sector', 'descripcion')),
                 'coberturas': coberturas,
                 'contactos': contactos,
                 'carrusel': carrusel,
@@ -261,7 +274,10 @@ def configuracion_sitio_web(request):
                     # Crear nuevas redes
                     for tipo, url in data['redesSociales'].items():
                         if url.strip():  # Solo crear si hay URL
+                            # Obtener el nombre de la red social
+                            nombre_red = dict(RedSocial.REDES_CHOICES).get(tipo, tipo.title())
                             RedSocial.objects.create(
+                                nombre=nombre_red,
                                 tipo=tipo,
                                 url=url,
                                 activo=True
@@ -283,6 +299,39 @@ def configuracion_sitio_web(request):
 
 @csrf_exempt
 @require_http_methods(["GET"])
+def sitio_web_verificacion(request):
+    """Vista para verificar que el módulo esté funcionando"""
+    try:
+        # Verificar que los modelos principales existan
+        info_sitio = InformacionSitio.objects.filter(id=1).exists()
+        empresa = Empresa.objects.filter(id=1).exists()
+        servicios_count = Servicio.objects.count()
+        planes_count = Plan.objects.count()
+        contactos_count = Contacto.objects.count()
+        
+        data = {
+            'success': True,
+            'message': 'Módulo de sitio web funcionando correctamente',
+            'data': {
+                'informacion_sitio': info_sitio,
+                'empresa': empresa,
+                'servicios_count': servicios_count,
+                'planes_count': planes_count,
+                'contactos_count': contactos_count,
+                'status': 'ok'
+            }
+        }
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False, 
+            'message': f'Error en el módulo: {str(e)}'
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
 def sitio_web_publico(request):
     """Vista pública para obtener información del sitio web"""
     try:
@@ -301,8 +350,20 @@ def sitio_web_publico(request):
         # Obtener servicios activos
         servicios = list(Servicio.objects.filter(activo=True).values('id', 'nombre', 'descripcion', 'icono', 'imagen', 'orden'))
         
-        # Obtener planes activos
-        planes = list(Plan.objects.filter(activo=True).values('id', 'nombre', 'velocidad', 'precio', 'descripcion', 'caracteristicas', 'popular', 'orden'))
+        # Obtener todos los planes (mostrar todos independientemente del estado para el sitio público)
+        planes = list(Plan.objects.all().values('id', 'tipo_plan', 'precio', 'descripcion').order_by('precio'))
+        
+        # Obtener todos los sectores (mostrar todos independientemente del estado para el sitio público)
+        sectores = list(Sector.objects.all().values('id', 'nombre_sector', 'descripcion').order_by('nombre_sector'))
+        
+        # Log para depuración
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Sitio web público - Planes encontrados: {len(planes)}, Sectores encontrados: {len(sectores)}")
+        if len(planes) > 0:
+            logger.info(f"Primeros planes: {planes[:3]}")
+        if len(sectores) > 0:
+            logger.info(f"Primeros sectores: {sectores[:3]}")
         
         # Obtener coberturas activas
         coberturas = list(Cobertura.objects.filter(activo=True).values('id', 'zona', 'descripcion', 'coordenadas', 'orden'))
@@ -353,6 +414,7 @@ def sitio_web_publico(request):
             },
             'servicios': servicios,
             'planes': planes,
+            'sectores': sectores,
             'coberturas': coberturas,
             'contactos': contactos,
             'carrusel': carrusel,
@@ -383,3 +445,47 @@ def sitio_web_publico(request):
         
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def solicitud_instalacion(request):
+    """Vista para recibir solicitudes de instalación desde el sitio web público"""
+    try:
+        data = json.loads(request.body)
+        
+        # Validar campos requeridos
+        required_fields = ['nombre', 'telefono', 'email', 'direccion']
+        for field in required_fields:
+            if not data.get(field):
+                return JsonResponse({
+                    'success': False,
+                    'message': f'El campo {field} es requerido'
+                }, status=400)
+        
+        # Crear solicitud
+        solicitud = SolicitudInstalacion.objects.create(
+            nombre=data.get('nombre'),
+            telefono=data.get('telefono'),
+            email=data.get('email'),
+            direccion=data.get('direccion'),
+            plan=data.get('plan', ''),
+            comentarios=data.get('comentarios', ''),
+            estado='pendiente'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Solicitud recibida exitosamente. Nos pondremos en contacto contigo pronto.',
+            'id': solicitud.id
+        }, status=201)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Error al procesar los datos. Por favor, verifica el formato.'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Error al procesar la solicitud: {str(e)}'
+        }, status=500)

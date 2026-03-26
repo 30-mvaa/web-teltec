@@ -68,6 +68,40 @@ interface GastoStats {
   promedio: number
 }
 
+interface GastoTendencias {
+  tendencias: Array<{
+    mes: string
+    año: string
+    nombre_mes: string
+    cantidad: number
+    total: number
+  }>
+  categorias_por_mes: Record<string, Array<{ categoria: string; total: number }>>
+  mes_actual: number
+  mes_anterior: number
+  diferencia: number
+  porcentaje_cambio: number
+  top_categorias: Array<{ categoria: string; total: number }>
+}
+
+interface BalanceMensual {
+  año: number
+  mes: number
+  ingresos: number
+  num_ingresos: number
+  gastos: number
+  num_gastos: number
+  balance: number
+  rentabilidad: number
+  historial: Array<{
+    mes: string
+    nombre_mes: string
+    ingresos: number
+    gastos: number
+    balance: number
+  }>
+}
+
 type FormData = {
   descripcion: string
   categoria: string
@@ -85,7 +119,10 @@ export default function GastosPage() {
   // Estados principales
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [stats, setStats] = useState<GastoStats | null>(null)
+  const [tendencias, setTendencias] = useState<GastoTendencias | null>(null)
+  const [balance, setBalance] = useState<BalanceMensual | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingReportes, setLoadingReportes] = useState(false)
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -94,6 +131,7 @@ export default function GastosPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterCategoria, setFilterCategoria] = useState("todos")
   const [filterMetodo, setFilterMetodo] = useState("todos")
+  const [activeTab, setActiveTab] = useState("gastos")
   
   // Estados del modal
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -200,6 +238,37 @@ export default function GastosPage() {
     } catch (e) {
       console.error("Error cargando estadísticas:", e)
     }
+  }
+
+  // Cargar tendencias de gastos
+  const loadTendencias = async () => {
+    try {
+      const json = await apiRequest(`${API_ENDPOINTS.GASTOS_TENDENCIAS}?meses=6`)
+      if (json.success) {
+        setTendencias(json.data)
+      }
+    } catch (e) {
+      console.error("Error cargando tendencias:", e)
+    }
+  }
+
+  // Cargar balance mensual
+  const loadBalance = async () => {
+    try {
+      const json = await apiRequest(API_ENDPOINTS.GASTOS_BALANCE)
+      if (json.success) {
+        setBalance(json.data)
+      }
+    } catch (e) {
+      console.error("Error cargando balance:", e)
+    }
+  }
+
+  // Cargar todos los datos de reportes
+  const loadReportes = async () => {
+    setLoadingReportes(true)
+    await Promise.all([loadTendencias(), loadBalance()])
+    setLoadingReportes(false)
   }
 
   // Manejar selección de archivo
@@ -442,6 +511,13 @@ export default function GastosPage() {
     }
   }, [])
 
+  // Cargar reportes cuando se seleccione el tab de reportes/balance
+  useEffect(() => {
+    if (activeTab === 'reportes' || activeTab === 'balance') {
+      loadReportes()
+    }
+  }, [activeTab])
+
   // Búsqueda con debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -582,11 +658,12 @@ export default function GastosPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="gastos" className="space-y-6">
-          <TabsList className="grid grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid grid-cols-4">
             <TabsTrigger value="gastos">Registro de Gastos</TabsTrigger>
             <TabsTrigger value="categorias">Por Categorías</TabsTrigger>
             <TabsTrigger value="reportes">Reportes</TabsTrigger>
+            <TabsTrigger value="balance">Ingresos vs Gastos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="gastos" className="space-y-4">
@@ -869,6 +946,197 @@ export default function GastosPage() {
               </Card>
             </div>
           </TabsContent>
+
+          {/* Reportes - Tendencias */}
+          <TabsContent value="reportes" className="space-y-6">
+            {loadingReportes ? (
+              <div className="flex items-center justify-center p-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <>
+                {/* Comparación Mes Actual vs Anterior */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+                    <CardContent className="p-6">
+                      <p className="text-orange-100 text-sm font-medium">Gastos Mes Anterior</p>
+                      <p className="text-3xl font-bold">${tendencias?.mes_anterior.toFixed(2) || '0.00'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                    <CardContent className="p-6">
+                      <p className="text-blue-100 text-sm font-medium">Gastos Mes Actual</p>
+                      <p className="text-3xl font-bold">${tendencias?.mes_actual.toFixed(2) || '0.00'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className={`${(tendencias?.porcentaje_cambio || 0) > 0 ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-green-500 to-green-600'} text-white`}>
+                    <CardContent className="p-6">
+                      <p className="text-white/80 text-sm font-medium">Cambio vs Mes Anterior</p>
+                      <p className="text-3xl font-bold">
+                        {(tendencias?.porcentaje_cambio || 0) > 0 ? '+' : ''}{tendencias?.porcentaje_cambio.toFixed(1) || '0'}%
+                      </p>
+                      <p className="text-sm text-white/80">
+                        ${Math.abs(tendencias?.diferencia || 0).toFixed(2)} {(tendencias?.diferencia || 0) > 0 ? 'más' : 'menos'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tendencia últimos 6 meses */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <TrendingDown className="mr-2 h-5 w-5" />
+                      Tendencia de Gastos - Últimos 6 Meses
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Mes</TableHead>
+                            <TableHead>Cantidad</TableHead>
+                            <TableHead>Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {tendencias?.tendencias.map((t) => (
+                            <TableRow key={t.mes}>
+                              <TableCell className="font-medium">{t.nombre_mes} {t.año}</TableCell>
+                              <TableCell>{t.cantidad}</TableCell>
+                              <TableCell className="font-bold">${t.total.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                          {(!tendencias?.tendencias || tendencias.tendencias.length === 0) && (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center py-8 text-gray-500">
+                                No hay datos de tendencia disponibles
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Top 5 Categorías */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <PieChart className="mr-2 h-5 w-5" />
+                      Top 5 Categorías del Mes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {tendencias?.top_categorias.map((cat, idx) => (
+                        <div key={cat.categoria} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 text-blue-600 font-bold">
+                              {idx + 1}
+                            </div>
+                            <span className="font-medium">{cat.categoria}</span>
+                          </div>
+                          <span className="font-bold text-lg">${cat.total.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      {(!tendencias?.top_categorias || tendencias.top_categorias.length === 0) && (
+                        <p className="text-center py-4 text-gray-500">No hay categorías registradas</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Balance Ingresos vs Gastos */}
+          <TabsContent value="balance" className="space-y-6">
+            {loadingReportes ? (
+              <div className="flex items-center justify-center p-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <>
+                {/* Cards de Balance */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
+                    <CardContent className="p-6">
+                      <p className="text-green-100 text-sm font-medium">Ingresos del Mes</p>
+                      <p className="text-3xl font-bold">${balance?.ingresos.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm text-green-200">{balance?.num_ingresos || 0} transacciones</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
+                    <CardContent className="p-6">
+                      <p className="text-red-100 text-sm font-medium">Gastos del Mes</p>
+                      <p className="text-3xl font-bold">${balance?.gastos.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm text-red-200">{balance?.num_gastos || 0} transacciones</p>
+                    </CardContent>
+                  </Card>
+                  <Card className={`${(balance?.balance || 0) >= 0 ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-gradient-to-r from-purple-500 to-purple-600'} text-white`}>
+                    <CardContent className="p-6">
+                      <p className="text-white/80 text-sm font-medium">Balance</p>
+                      <p className="text-3xl font-bold">${balance?.balance.toFixed(2) || '0.00'}</p>
+                      <p className="text-sm text-white/80">{(balance?.balance || 0) >= 0 ? 'Superavit' : 'Déficit'}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-r from-violet-500 to-violet-600 text-white">
+                    <CardContent className="p-6">
+                      <p className="text-violet-100 text-sm font-medium">Rentabilidad</p>
+                      <p className="text-3xl font-bold">{balance?.rentabilidad.toFixed(1) || '0'}%</p>
+                      <p className="text-sm text-violet-200">Margen de ganancia</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Historial Ingresos vs Gastos */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <BarChart3 className="mr-2 h-5 w-5" />
+                      Historial Ingresos vs Gastos - Últimos 6 Meses
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Mes</TableHead>
+                            <TableHead className="text-right">Ingresos</TableHead>
+                            <TableHead className="text-right">Gastos</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {balance?.historial.map((h) => (
+                            <TableRow key={h.mes}>
+                              <TableCell className="font-medium">{h.nombre_mes}</TableCell>
+                              <TableCell className="text-right text-green-600 font-medium">${h.ingresos.toFixed(2)}</TableCell>
+                              <TableCell className="text-right text-red-600 font-medium">${h.gastos.toFixed(2)}</TableCell>
+                              <TableCell className={`text-right font-bold ${h.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                ${h.balance.toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {(!balance?.historial || balance.historial.length === 0) && (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                                No hay datos de historial disponibles
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -896,7 +1164,7 @@ export default function GastosPage() {
               <div>
                 <Label htmlFor="categoria">Categoría *</Label>
                 <Select value={formData.categoria} onValueChange={(v) => setFormData(prev => ({ ...prev, categoria: v }))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="categoria">
                     <SelectValue placeholder="Seleccionar categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -944,7 +1212,7 @@ export default function GastosPage() {
               <div>
                 <Label htmlFor="metodo_pago">Método de Pago *</Label>
                 <Select value={formData.metodo_pago} onValueChange={(v) => setFormData(prev => ({ ...prev, metodo_pago: v }))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="metodo_pago">
                     <SelectValue placeholder="Seleccionar método" />
                   </SelectTrigger>
                   <SelectContent>
@@ -960,7 +1228,7 @@ export default function GastosPage() {
 
             {/* Sección de comprobante */}
             <div className="space-y-2">
-              <Label>Comprobante</Label>
+              <Label htmlFor="comprobante_url">Comprobante</Label>
               
               {/* Opción 1: Subir archivo */}
               <div className="space-y-2">
@@ -970,6 +1238,7 @@ export default function GastosPage() {
                     variant="outline"
                     onClick={openFileSelector}
                     className="flex items-center space-x-2"
+                    aria-label="Subir archivo de comprobante"
                   >
                     <Upload className="h-4 w-4" />
                     Subir Archivo
@@ -980,6 +1249,7 @@ export default function GastosPage() {
                       variant="outline"
                       onClick={clearFile}
                       className="flex items-center space-x-2 text-red-600"
+                      aria-label="Limpiar archivo seleccionado"
                     >
                       <X className="h-4 w-4" />
                       Limpiar
@@ -1008,6 +1278,7 @@ export default function GastosPage() {
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">O ingresar URL del comprobante:</p>
                 <Input
+                  id="comprobante_url"
                   type="url"
                   value={formData.comprobante_url}
                   onChange={(e) => setFormData(prev => ({ ...prev, comprobante_url: e.target.value }))}

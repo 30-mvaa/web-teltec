@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from django.db import connection
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import os
 import requests
 import json
@@ -19,19 +19,55 @@ logger = logging.getLogger(__name__)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_notificaciones(request):
-    """Listar todas las notificaciones"""
+    """Listar todas las notificaciones con paginación"""
     try:
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 20))
+        search = request.GET.get('search', '').strip()
+        filtro_tipo = request.GET.get('tipo', 'todos')
+        filtro_estado = request.GET.get('estado', 'todos')
+        
+        offset = (page - 1) * page_size
+        
+        where_clauses = []
+        params = []
+        
+        if search:
+            where_clauses.append("(c.nombres || ' ' || c.apellidos ILIKE %s OR n.mensaje ILIKE %s)")
+            params.extend([f'%{search}%', f'%{search}%'])
+        
+        if filtro_tipo and filtro_tipo != 'todos':
+            where_clauses.append("n.tipo = %s")
+            params.append(filtro_tipo)
+        
+        if filtro_estado and filtro_estado != 'todos':
+            where_clauses.append("n.estado = %s")
+            params.append(filtro_estado)
+        
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+        
         with connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
+                SELECT COUNT(*)
+                FROM notificaciones n
+                LEFT JOIN clientes c ON n.cliente_id = c.id
+                WHERE {where_sql}
+            """, params)
+            total_count = cursor.fetchone()[0]
+            
+            cursor.execute(f"""
                 SELECT n.id, n.cliente_id, n.tipo, n.mensaje, n.fecha_envio, n.estado, n.canal, 
                        n.fecha_creacion, n.fecha_programada, n.intentos,
                        c.nombres || ' ' || c.apellidos as cliente_nombre,
                        c.telefono as cliente_telefono,
-                       c.telegram_chat_id as cliente_telegram_chat_id
+                       c.telefono as cliente_whatsapp_number
                 FROM notificaciones n
                 LEFT JOIN clientes c ON n.cliente_id = c.id
+                WHERE {where_sql}
                 ORDER BY n.fecha_creacion DESC
-            """)
+                LIMIT %s OFFSET %s
+            """, params + [page_size, offset])
+            
             notificaciones = []
             for row in cursor.fetchall():
                 notificaciones.append({
@@ -47,12 +83,18 @@ def list_notificaciones(request):
                     'intentos': row[9],
                     'cliente_nombre': row[10] if row[10] else 'Cliente no encontrado',
                     'cliente_telefono': row[11] if row[11] else '',
-                    'cliente_telegram_chat_id': row[12] if row[12] else ''
+                    'cliente_whatsapp_number': row[12] if row[12] else ''
                 })
         
         return Response({
             'success': True,
-            'data': notificaciones
+            'data': {
+                'results': notificaciones,
+                'count': total_count,
+                'page': page,
+                'page_size': page_size,
+                'total_pages': (total_count + page_size - 1) // page_size
+            }
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
@@ -122,9 +164,11 @@ def estado_pagos_clientes(request):
                     c.apellidos,
                     c.telefono,
                     c.email,
-                    c.precio_plan,
-                    c.tipo_plan,
-                    c.telegram_chat_id,
+                    c.estado,
+                    c.fecha_registro,
+                    -- Información del plan actual
+                    COALESCE(p.tipo_plan, 'Sin plan') as tipo_plan,
+                    COALESCE(p.precio, 0) as precio_plan,
                     EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) as dias_desde_registro,
                     EXTRACT(DAY FROM (CURRENT_DATE - COALESCE(
                         (SELECT MAX(fecha_pago) FROM pagos WHERE cliente_id = c.id), 
@@ -151,10 +195,43 @@ def estado_pagos_clientes(request):
                             c.fecha_registro
                         ))) > 25 THEN true
                         ELSE false
-                    END as debe_pagar
+                    END as debe_pagar,
+                    -- Información de deudas
+                    COALESCE((
+                        SELECT SUM(p.monto) 
+                        FROM pagos p 
+                        WHERE p.cliente_id = c.id 
+                        AND EXTRACT(YEAR FROM p.fecha_pago) = EXTRACT(YEAR FROM CURRENT_DATE)
+                    ), 0) as total_pagado_anual,
+                    COALESCE((
+                        SELECT COUNT(*) 
+                        FROM pagos p 
+                        WHERE p.cliente_id = c.id 
+                        AND EXTRACT(YEAR FROM p.fecha_pago) = EXTRACT(YEAR FROM CURRENT_DATE)
+                    ), 0) as total_pagos_anual,
+                    COALESCE((
+                        SELECT MAX(fecha_pago) 
+                        FROM pagos p 
+                        WHERE p.cliente_id = c.id
+                    ), c.fecha_registro) as ultimo_pago,
+                    -- Cálculo de deuda actual
+                    CASE 
+                        WHEN p.precio IS NOT NULL AND p.precio > 0 THEN
+                            (EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) / 30.0 * p.precio) - 
+                            COALESCE((
+                                SELECT SUM(pagos.monto) 
+                                FROM pagos pagos 
+                                WHERE pagos.cliente_id = c.id
+                            ), 0)
+                        ELSE 0
+                    END as deuda_actual
                 FROM clientes c
-                WHERE c.estado = 'activo' OR c.estado IS NULL
-                ORDER BY dias_sin_pago DESC, c.nombres ASC
+                LEFT JOIN clientes_planes cp ON c.id = cp.id_cliente AND cp.estado = 'activo'
+                LEFT JOIN planes p ON cp.id_plan = p.id_plan
+                ORDER BY 
+                    CASE WHEN c.estado = 'activo' OR c.estado IS NULL THEN 0 ELSE 1 END,
+                    dias_sin_pago DESC, 
+                    c.nombres ASC
             """)
             
             clientes = []
@@ -166,13 +243,20 @@ def estado_pagos_clientes(request):
                     'apellidos': row[2].strip() if row[2] else '',
                     'telefono': row[3],
                     'email': row[4],
-                    'precio_plan': float(row[5]) if row[5] else 0,
-                    'tipo_plan': row[6],
-                    'telegram_chat_id': row[7],
-                    'dias_desde_registro': int(row[8]) if row[8] else 0,
-                    'dias_sin_pago': int(row[9]) if row[9] else 0,
-                    'estado_pago': row[10],
-                    'debe_pagar': row[11]
+                    'estado': row[5] or 'activo',
+                    'fecha_registro': row[6].isoformat() if row[6] else None,
+                    'tipo_plan': row[7],
+                    'precio_plan': float(row[8]) if row[8] else 0,
+                    'dias_desde_registro': int(row[9]) if row[9] else 0,
+                    'dias_sin_pago': int(row[10]) if row[10] else 0,
+                    'estado_pago': row[11],
+                    'debe_pagar': row[12],
+                    # Información de recaudación
+                    'total_pagado_anual': float(row[13]) if row[13] else 0,
+                    'total_pagos_anual': int(row[14]) if row[14] else 0,
+                    'ultimo_pago': row[15].isoformat() if row[15] else None,
+                    # Información de deudas
+                    'deuda_actual': float(row[16]) if row[16] else 0
                 })
         
         # Debug: imprimir los primeros 3 clientes
@@ -244,7 +328,9 @@ def create_notificacion(request):
         cliente_id = data.get('cliente_id')
         tipo = data.get('tipo')
         mensaje = data.get('mensaje')
-        canal = data.get('canal', 'telegram')
+        canal = data.get('canal', 'whatsapp')  # Cambiar default a whatsapp
+        
+        print(f"🔍 DEBUG - Datos recibidos: {data}")
         
         if not all([cliente_id, tipo, mensaje]):
             return Response({
@@ -252,7 +338,16 @@ def create_notificacion(request):
                 'message': 'Faltan datos requeridos: cliente_id, tipo, mensaje'
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Verificar que el cliente existe
         with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM clientes WHERE id = %s", [cliente_id])
+            if not cursor.fetchone():
+                return Response({
+                    'success': False,
+                    'message': 'Cliente no encontrado'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Insertar la notificación
             cursor.execute("""
                 INSERT INTO notificaciones (cliente_id, tipo, mensaje, canal, estado, fecha_creacion)
                 VALUES (%s, %s, %s, %s, %s, %s)
@@ -260,6 +355,7 @@ def create_notificacion(request):
             """, [cliente_id, tipo, mensaje, canal, 'pendiente', timezone.now()])
             
             notificacion_id = cursor.fetchone()[0]
+            print(f"✅ DEBUG - Notificación creada con ID: {notificacion_id}")
         
         return Response({
             'success': True,
@@ -268,6 +364,7 @@ def create_notificacion(request):
         }, status=status.HTTP_201_CREATED)
         
     except Exception as e:
+        print(f"❌ DEBUG - Error al crear notificación: {str(e)}")
         return Response({
             'success': False,
             'message': f'Error al crear notificación: {str(e)}'
@@ -330,28 +427,29 @@ def send_telegram(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def procesar_notificaciones(request):
-    """Procesar notificaciones automáticamente"""
+    """Procesar notificaciones automáticamente - Solo WhatsApp"""
     try:
         procesadas = 0
         errores = 0
         errores_detalle = []
         
-        # Verificar token de Telegram
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        if not bot_token:
-            return Response({
-                'success': False,
-                'message': 'Token de Telegram no configurado. Configure TELEGRAM_BOT_TOKEN en las variables de entorno.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # Verificar configuración de WhatsApp Business API
+        whatsapp_token = os.getenv('WHATSAPP_BUSINESS_TOKEN')
+        whatsapp_phone_id = os.getenv('WHATSAPP_PHONE_ID')
+        usar_whatsapp_api = whatsapp_token and whatsapp_phone_id
         
-        # Obtener notificaciones pendientes
+        logger.info(f"🔧 Configuración WhatsApp API: {'✅ Configurada' if usar_whatsapp_api else '❌ No configurada (se usarán URLs manuales)'}")
+        
+        # Obtener notificaciones pendientes (solo WhatsApp)
         with connection.cursor() as cursor:
             cursor.execute("""
-                SELECT n.id, n.cliente_id, n.mensaje, n.canal, c.telegram_chat_id, c.telefono, c.email, c.nombres, c.apellidos
+                SELECT n.id, n.cliente_id, n.mensaje, n.canal, c.telefono, c.email, c.nombres, c.apellidos
                 FROM notificaciones n
                 JOIN clientes c ON n.cliente_id = c.id
                 WHERE n.estado = 'pendiente'
+                AND n.canal = 'whatsapp'
                 ORDER BY n.fecha_creacion ASC
+                LIMIT 200
             """)
             
             notificaciones = cursor.fetchall()
@@ -367,68 +465,189 @@ def procesar_notificaciones(request):
                 }
             }, status=status.HTTP_200_OK)
         
+        logger.info(f"📊 Procesando {len(notificaciones)} notificaciones de WhatsApp pendientes")
+        
         for notif in notificaciones:
             try:
-                notif_id, cliente_id, mensaje, canal, telegram_chat_id, telefono, email, nombres, apellidos = notif
+                notif_id, cliente_id, mensaje, canal, telefono, email, nombres, apellidos = notif
+                enviado = False
+                error_mensaje = None
                 
-                if canal == 'telegram' and telegram_chat_id:
-                    # Enviar por Telegram
-                    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                    payload = {
-                        'chat_id': telegram_chat_id,
-                        'text': mensaje,
-                        'parse_mode': 'HTML'
-                    }
+                logger.debug(f"📨 Procesando notificación {notif_id}: cliente={nombres} {apellidos}, teléfono={telefono}")
+                
+                # Validar que el cliente tenga teléfono
+                if not telefono:
+                    error_mensaje = "Cliente no tiene número de teléfono configurado"
+                    logger.warning(f"⚠️ Cliente {nombres} {apellidos} (ID: {cliente_id}) no tiene teléfono")
+                else:
+                    # Limpiar y validar número de teléfono
+                    import re
+                    numero_limpio = re.sub(r'\D', '', telefono)
                     
-                    response = requests.post(url, json=payload)
-                    response_data = response.json()
-                    
-                    if response.status_code == 200 and response_data.get('ok'):
-                        # Marcar como enviado
-                        with connection.cursor() as update_cursor:
-                            update_cursor.execute("""
-                                UPDATE notificaciones 
-                                SET estado = 'enviado', fecha_envio = %s
-                                WHERE id = %s
-                            """, [timezone.now(), notif_id])
-                        procesadas += 1
-                        logger.info(f"Notificación {notif_id} enviada exitosamente a {nombres} {apellidos}")
+                    # Validar formato del número
+                    if len(numero_limpio) < 10:
+                        error_mensaje = f"Número de teléfono inválido: {telefono} (menos de 10 dígitos)"
+                        logger.warning(f"⚠️ Número inválido para {nombres} {apellidos}: {telefono}")
                     else:
-                        # Marcar como fallido
-                        with connection.cursor() as update_cursor:
+                        # Agregar código de país si no lo tiene (Ecuador: 593)
+                        if not numero_limpio.startswith('593'):
+                            if len(numero_limpio) == 10:
+                                numero_limpio = '593' + numero_limpio
+                            elif numero_limpio.startswith('0'):
+                                numero_limpio = '593' + numero_limpio[1:]
+                            elif len(numero_limpio) == 9:
+                                numero_limpio = '593' + numero_limpio
+                        
+                        # Intentar envío
+                        if usar_whatsapp_api:
+                            # Envío automático usando WhatsApp Business API
+                            try:
+                                url = f"https://graph.facebook.com/v17.0/{whatsapp_phone_id}/messages"
+                                headers = {
+                                    'Authorization': f'Bearer {whatsapp_token}',
+                                    'Content-Type': 'application/json'
+                                }
+                                
+                                payload = {
+                                    "messaging_product": "whatsapp",
+                                    "to": numero_limpio,
+                                    "type": "text",
+                                    "text": {
+                                        "body": mensaje
+                                    }
+                                }
+                                
+                                response = requests.post(url, headers=headers, json=payload, timeout=10)
+                                
+                                if response.status_code == 200:
+                                    enviado = True
+                                    response_data = response.json()
+                                    logger.info(f"✅ Notificación {notif_id} enviada por WhatsApp API a {nombres} {apellidos} ({numero_limpio})")
+                                else:
+                                    try:
+                                        error_data = response.json()
+                                        error_mensaje = error_data.get('error', {}).get('message', f'Error HTTP {response.status_code}')
+                                        error_code = error_data.get('error', {}).get('code', '')
+                                        logger.error(f"❌ Error WhatsApp API {notif_id}: {error_mensaje} (código: {error_code})")
+                                    except:
+                                        error_mensaje = f"Error HTTP {response.status_code}: {response.text[:200]}"
+                                        logger.error(f"❌ Error WhatsApp API {notif_id}: {error_mensaje}")
+                            except requests.exceptions.Timeout:
+                                error_mensaje = "Timeout al conectar con WhatsApp API"
+                                logger.error(f"❌ Timeout enviando WhatsApp {notif_id}")
+                            except requests.exceptions.RequestException as e:
+                                error_mensaje = f"Error de conexión con WhatsApp API: {str(e)}"
+                                logger.error(f"❌ Error de conexión WhatsApp {notif_id}: {str(e)}")
+                            except Exception as e:
+                                error_mensaje = f"Error inesperado: {str(e)}"
+                                logger.error(f"❌ Excepción enviando WhatsApp {notif_id}: {str(e)}", exc_info=True)
+                        else:
+                            # WhatsApp API no configurada - generar URL de WhatsApp Web para envío manual
+                            try:
+                                # Obtener número de WhatsApp de la empresa desde configuración
+                                from configuracion.models import ConfiguracionSistema
+                                try:
+                                    empresa_whatsapp = ConfiguracionSistema.objects.get(clave='empresa_whatsapp').valor
+                                    empresa_whatsapp_limpio = re.sub(r'\D', '', empresa_whatsapp)
+                                    if not empresa_whatsapp_limpio.startswith('593'):
+                                        if empresa_whatsapp_limpio.startswith('0'):
+                                            empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio[1:]
+                                        else:
+                                            empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio
+                                except:
+                                    empresa_whatsapp_limpio = '593984517703'  # Fallback
+                                
+                                # Generar URL de WhatsApp Web con el mensaje prellenado
+                                mensaje_codificado = requests.utils.quote(mensaje)
+                                url_whatsapp = f"https://api.whatsapp.com/send/?phone={numero_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+                                
+                                # Guardar la URL en la notificación (usando un campo adicional o en el mensaje)
+                                # Por ahora, guardamos la URL en un campo JSON o la retornamos
+                                # Marcamos como "pendiente" pero con URL disponible
+                                logger.info(f"📱 URL de WhatsApp generada para notificación {notif_id}: {url_whatsapp[:100]}...")
+                                
+                                # Guardar URL en la base de datos (si hay un campo para eso) o dejarla pendiente
+                                # La URL se puede obtener desde el frontend usando el endpoint de obtener notificaciones
+                                # Por ahora, dejamos la notificación como pendiente
+                                # El frontend puede generar la URL cuando la necesite
+                                continue  # Dejar como pendiente, el frontend puede generar la URL
+                            except Exception as url_error:
+                                logger.error(f"❌ Error generando URL de WhatsApp para notificación {notif_id}: {str(url_error)}")
+                                error_mensaje = f"Error generando URL de WhatsApp: {str(url_error)}"
+                
+                # Actualizar estado de la notificación
+                with connection.cursor() as update_cursor:
+                    if enviado:
+                        update_cursor.execute("""
+                            UPDATE notificaciones 
+                            SET estado = 'enviado', fecha_envio = %s, intentos = intentos + 1
+                            WHERE id = %s
+                        """, [timezone.now(), notif_id])
+                        procesadas += 1
+                    elif error_mensaje:
+                        # Incrementar intentos
+                        update_cursor.execute("""
+                            UPDATE notificaciones 
+                            SET intentos = intentos + 1
+                            WHERE id = %s
+                        """, [notif_id])
+                        
+                        # Verificar intentos
+                        update_cursor.execute("SELECT intentos FROM notificaciones WHERE id = %s", [notif_id])
+                        intentos_row = update_cursor.fetchone()
+                        intentos = intentos_row[0] if intentos_row else 1
+                        
+                        # Marcar como fallido después de 3 intentos
+                        if intentos >= 3:
                             update_cursor.execute("""
                                 UPDATE notificaciones 
                                 SET estado = 'fallido'
                                 WHERE id = %s
                             """, [notif_id])
-                        errores += 1
-                        error_msg = response_data.get('description', 'Error desconocido')
-                        errores_detalle.append(f"Cliente {nombres} {apellidos}: {error_msg}")
-                        logger.error(f"Error enviando notificación {notif_id}: {error_msg}")
-                else:
-                    # Marcar como fallido si no hay chat_id
+                            errores += 1
+                            errores_detalle.append(f"Cliente {nombres} {apellidos}: {error_mensaje}")
+                            logger.warning(f"⚠️ Notificación {notif_id} marcada como fallida después de {intentos} intentos: {error_mensaje}")
+                        else:
+                            # Dejar como pendiente para reintentar
+                            logger.info(f"ℹ️ Notificación {notif_id} quedará pendiente para reintentar (intento {intentos}/3): {error_mensaje}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Excepción procesando notificación {notif_id}: {str(e)}", exc_info=True)
+                # Incrementar intentos y posiblemente marcar como fallido
+                try:
                     with connection.cursor() as update_cursor:
                         update_cursor.execute("""
                             UPDATE notificaciones 
-                            SET estado = 'fallido'
+                            SET intentos = intentos + 1
                             WHERE id = %s
                         """, [notif_id])
-                    errores += 1
-                    errores_detalle.append(f"Cliente {nombres} {apellidos}: No tiene telegram_chat_id configurado")
-                    logger.warning(f"Cliente {nombres} {apellidos} no tiene telegram_chat_id configurado")
-                    
-            except Exception as e:
-                logger.error(f"Error procesando notificación {notif_id}: {str(e)}")
+                        
+                        update_cursor.execute("SELECT intentos FROM notificaciones WHERE id = %s", [notif_id])
+                        intentos_row = update_cursor.fetchone()
+                        intentos = intentos_row[0] if intentos_row else 0
+                        
+                        if intentos >= 3:
+                            update_cursor.execute("""
+                                UPDATE notificaciones 
+                                SET estado = 'fallido'
+                                WHERE id = %s
+                            """, [notif_id])
+                            errores += 1
+                            errores_detalle.append(f"Cliente {nombres} {apellidos}: Excepción - {str(e)}")
+                except Exception as update_error:
+                    logger.error(f"❌ Error actualizando intentos para notificación {notif_id}: {str(update_error)}")
+                
                 errores += 1
-                errores_detalle.append(f"Cliente {nombres} {apellidos}: {str(e)}")
         
         # Preparar mensaje de respuesta
         if procesadas > 0 and errores == 0:
-            message = f"✅ Procesamiento completado exitosamente: {procesadas} notificaciones enviadas"
+            message = f"✅ Procesamiento completado exitosamente: {procesadas} notificaciones enviadas por WhatsApp"
         elif procesadas > 0 and errores > 0:
-            message = f"⚠️ Procesamiento completado parcialmente: {procesadas} enviadas, {errores} errores"
+            message = f"⚠️ Procesamiento completado parcialmente: {procesadas} enviadas, {errores} con errores"
         else:
-            message = f"❌ Procesamiento falló: {errores} errores"
+            message = f"❌ No se pudieron procesar las notificaciones: {errores} errores"
+        
+        logger.info(f"📊 Resumen: {procesadas} procesadas, {errores} errores")
         
         return Response({
             'success': True,
@@ -436,12 +655,12 @@ def procesar_notificaciones(request):
             'data': {
                 'procesadas': procesadas,
                 'errores': errores,
-                'errores_detalle': errores_detalle[:5]  # Solo los primeros 5 errores
+                'errores_detalle': errores_detalle[:10]  # Primeros 10 errores
             }
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Error en procesamiento de notificaciones: {str(e)}")
+        logger.error(f"❌ Error en procesamiento de notificaciones: {str(e)}", exc_info=True)
         return Response({
             'success': False,
             'message': f'Error al procesar notificaciones: {str(e)}'
@@ -455,6 +674,7 @@ def notificacion_masiva(request):
         data = request.data
         tipo = data.get('tipo')
         mensaje = data.get('mensaje')
+        canal = 'whatsapp'  # Solo WhatsApp
         
         if not all([tipo, mensaje]):
             return Response({
@@ -462,21 +682,15 @@ def notificacion_masiva(request):
                 'message': 'Faltan datos: tipo y mensaje'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Obtener token de Telegram
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        if not bot_token:
-            return Response({
-                'success': False,
-                'message': 'Token de Telegram no configurado. Configure TELEGRAM_BOT_TOKEN en las variables de entorno.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Obtener todos los clientes activos con telegram_chat_id
+        # Obtener todos los clientes activos según el canal
         with connection.cursor() as cursor:
+            # Solo WhatsApp - obtener clientes con teléfono
             cursor.execute("""
-                SELECT id, nombres, apellidos, telegram_chat_id 
+                SELECT id, nombres, apellidos, telefono
                 FROM clientes 
-                WHERE estado = 'activo' AND telegram_chat_id IS NOT NULL
+                WHERE estado = 'activo' AND telefono IS NOT NULL
             """)
+            
             clientes = cursor.fetchall()
             
             # Contadores para el resultado
@@ -485,9 +699,14 @@ def notificacion_masiva(request):
             notificaciones_fallidas = 0
             errores = []
             
+            # Configuración de WhatsApp Business API (si está disponible)
+            whatsapp_token = os.getenv('WHATSAPP_BUSINESS_TOKEN')
+            whatsapp_phone_id = os.getenv('WHATSAPP_PHONE_ID')
+            usar_whatsapp_api = whatsapp_token and whatsapp_phone_id
+            
             # Procesar cada cliente
             for cliente in clientes:
-                cliente_id, nombres, apellidos, telegram_chat_id = cliente
+                cliente_id, nombres, apellidos, telefono = cliente
                 
                 try:
                     # Crear la notificación
@@ -495,42 +714,69 @@ def notificacion_masiva(request):
                         INSERT INTO notificaciones (cliente_id, tipo, mensaje, canal, estado, fecha_creacion)
                         VALUES (%s, %s, %s, %s, %s, %s)
                         RETURNING id
-                    """, [cliente_id, tipo, mensaje, 'telegram', 'pendiente', timezone.now()])
+                    """, [cliente_id, tipo, mensaje, 'whatsapp', 'pendiente', timezone.now()])
                     
                     notificacion_id = cursor.fetchone()[0]
                     notificaciones_creadas += 1
                     
-                    # Enviar inmediatamente por Telegram
-                    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                    payload = {
-                        'chat_id': telegram_chat_id,
-                        'text': mensaje,
-                        'parse_mode': 'HTML'
-                    }
+                    # Enviar por WhatsApp
+                    enviado = False
                     
-                    response = requests.post(url, json=payload)
-                    response_data = response.json()
+                    if telefono:
+                        # Enviar por WhatsApp
+                        if usar_whatsapp_api:
+                            # Envío automático usando WhatsApp Business API
+                            import re
+                            numero_limpio = re.sub(r'\D', '', telefono)
+                            
+                            # Agregar código de país si no lo tiene (Ecuador: 593)
+                            if not numero_limpio.startswith('593') and len(numero_limpio) == 10:
+                                numero_limpio = '593' + numero_limpio
+                            
+                            url = f"https://graph.facebook.com/v17.0/{whatsapp_phone_id}/messages"
+                            headers = {
+                                'Authorization': f'Bearer {whatsapp_token}',
+                                'Content-Type': 'application/json'
+                            }
+                            
+                            payload = {
+                                "messaging_product": "whatsapp",
+                                "to": numero_limpio,
+                                "type": "text",
+                                "text": {
+                                    "body": mensaje
+                                }
+                            }
+                            
+                            response = requests.post(url, headers=headers, json=payload, timeout=10)
+                            
+                            if response.status_code == 200:
+                                enviado = True
+                            else:
+                                error_msg = response.json().get('error', {}).get('message', 'Error desconocido')
+                                errores.append(f"Cliente {nombres} {apellidos}: {error_msg}")
+                        else:
+                            # Si no hay API configurada, marcar como pendiente para envío manual
+                            # El usuario deberá enviar manualmente desde la interfaz
+                            enviado = False
+                            errores.append(f"Cliente {nombres} {apellidos}: WhatsApp API no configurada")
                     
-                    if response.status_code == 200 and response_data.get('ok'):
-                        # Marcar como enviado
-                        with connection.cursor() as update_cursor:
+                    # Actualizar estado de la notificación
+                    with connection.cursor() as update_cursor:
+                        if enviado:
                             update_cursor.execute("""
                                 UPDATE notificaciones 
                                 SET estado = 'enviado', fecha_envio = %s
                                 WHERE id = %s
                             """, [timezone.now(), notificacion_id])
-                        notificaciones_enviadas += 1
-                    else:
-                        # Marcar como fallido
-                        with connection.cursor() as update_cursor:
+                            notificaciones_enviadas += 1
+                        else:
                             update_cursor.execute("""
                                 UPDATE notificaciones 
                                 SET estado = 'fallido'
                                 WHERE id = %s
                             """, [notificacion_id])
-                        notificaciones_fallidas += 1
-                        error_msg = response_data.get('description', 'Error desconocido')
-                        errores.append(f"Cliente {nombres} {apellidos}: {error_msg}")
+                            notificaciones_fallidas += 1
                         
                 except Exception as e:
                     notificaciones_fallidas += 1
@@ -595,63 +841,131 @@ def mark_enviado(request, notificacion_id):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def generar_notificaciones_automaticas(request):
-    """Generar notificaciones automáticas basadas en el estado de pagos"""
+    """Generar notificaciones automáticas basadas en el estado de pagos y deudas reales"""
     try:
+        logger.info("🚀 Iniciando generación de notificaciones automáticas")
         notificaciones_generadas = 0
         
         with connection.cursor() as cursor:
-            # Obtener clientes con pagos próximos a vencer (25-29 días)
+            # Obtener todos los clientes activos con sus planes y calcular deuda real
             cursor.execute("""
-                SELECT c.id, c.nombres, c.apellidos, c.telegram_chat_id,
-                       EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) as dias_desde_registro
+                SELECT 
+                    c.id,
+                    c.nombres,
+                    c.apellidos,
+                    c.telefono,
+                    c.fecha_registro,
+                    COALESCE(p.precio, 0) as precio_plan,
+                    COALESCE(SUM(pagos.monto), 0) as total_pagado,
+                    EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) as dias_desde_registro
                 FROM clientes c
-                WHERE c.estado = 'activo' 
-                AND EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) BETWEEN 25 AND 29
-                AND NOT EXISTS (
-                    SELECT 1 FROM notificaciones n 
-                    WHERE n.cliente_id = c.id 
-                    AND n.tipo = 'pago_proximo'
-                    AND n.fecha_creacion > CURRENT_DATE - INTERVAL '7 days'
-                )
+                LEFT JOIN clientes_planes cp ON c.id = cp.id_cliente AND cp.estado = 'activo'
+                LEFT JOIN planes p ON cp.id_plan = p.id_plan
+                LEFT JOIN pagos pagos ON c.id = pagos.cliente_id AND pagos.estado = 'completado'
+                WHERE c.estado = 'activo'
+                AND c.telefono IS NOT NULL
+                GROUP BY c.id, c.nombres, c.apellidos, c.telefono, c.fecha_registro, p.precio
+                HAVING COALESCE(p.precio, 0) > 0
             """)
             
-            clientes_proximos = cursor.fetchall()
+            todos_los_clientes = cursor.fetchall()
+            logger.info(f"📊 Total de clientes activos con plan: {len(todos_los_clientes)}")
             
-            for cliente in clientes_proximos:
-                mensaje = f"🔔 Estimado {cliente[1]} {cliente[2]}, se aproxima la fecha de pago de su servicio de internet. Por favor acérquese a cancelar. ¡Gracias por su preferencia! - TelTec"
+            for cliente in todos_los_clientes:
+                cliente_id, nombres, apellidos, telefono, fecha_registro, precio_plan, total_pagado, dias_desde_registro = cliente
                 
-                cursor.execute("""
-                    INSERT INTO notificaciones (cliente_id, tipo, mensaje, canal, estado, fecha_creacion)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, [cliente[0], 'pago_proximo', mensaje, 'telegram', 'pendiente', timezone.now()])
-                notificaciones_generadas += 1
-            
-            # Obtener clientes con pagos vencidos (30+ días)
-            cursor.execute("""
-                SELECT c.id, c.nombres, c.apellidos, c.telegram_chat_id,
-                       EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) as dias_desde_registro
-                FROM clientes c
-                WHERE c.estado = 'activo' 
-                AND EXTRACT(DAY FROM (CURRENT_DATE - c.fecha_registro)) >= 30
-                AND NOT EXISTS (
-                    SELECT 1 FROM notificaciones n 
-                    WHERE n.cliente_id = c.id 
-                    AND n.tipo = 'pago_vencido'
-                    AND n.fecha_creacion > CURRENT_DATE - INTERVAL '3 days'
-                )
-            """)
-            
-            clientes_vencidos = cursor.fetchall()
-            
-            for cliente in clientes_vencidos:
-                mensaje = f"⚠️ Estimado {cliente[1]} {cliente[2]}, su pago está vencido. Su servicio de internet será posteriormente cortado. Acérquese a cancelar el servicio para restablecer la conexión. - TelTec"
+                # Calcular meses desde registro (misma lógica que módulo de deudas)
+                if fecha_registro:
+                    if hasattr(fecha_registro, 'date'):
+                        fecha_registro = fecha_registro.date()
+                    
+                    hoy = date.today()
+                    años_diferencia = hoy.year - fecha_registro.year
+                    meses_diferencia = hoy.month - fecha_registro.month
+                    meses_desde_registro = años_diferencia * 12 + meses_diferencia
+                    
+                    # Ajustar si el día actual es menor que el día de registro
+                    if hoy.day < fecha_registro.day:
+                        meses_desde_registro -= 1
+                    
+                    meses_desde_registro = max(0, meses_desde_registro)
+                else:
+                    meses_desde_registro = 0
                 
-                cursor.execute("""
-                    INSERT INTO notificaciones (cliente_id, tipo, mensaje, canal, estado, fecha_creacion)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, [cliente[0], 'pago_vencido', mensaje, 'telegram', 'pendiente', timezone.now()])
-                notificaciones_generadas += 1
+                # Calcular deuda actual
+                precio_plan = float(precio_plan) if precio_plan else 0
+                total_pagado = float(total_pagado) if total_pagado else 0
+                total_debe_teorico = meses_desde_registro * precio_plan
+                deuda_actual = max(0, total_debe_teorico - total_pagado)
+                
+                # Solo WhatsApp - verificar que tenga teléfono
+                if not telefono:
+                    logger.debug(f"⚠️ Cliente {nombres} {apellidos} (ID: {cliente_id}) sin teléfono, saltando...")
+                    continue
+                
+                # Determinar tipo de notificación según deuda y días
+                tipo_notificacion = None
+                mensaje = None
+                canal = 'whatsapp'
+                
+                # Clientes con pago próximo (tienen deuda pero no está vencida aún - 20-29 días desde último pago o registro)
+                if deuda_actual > 0 and deuda_actual <= precio_plan and dias_desde_registro >= 20 and dias_desde_registro < 30:
+                    # Verificar si ya se envió una notificación recientemente
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM notificaciones 
+                        WHERE cliente_id = %s 
+                        AND tipo = 'pago_proximo'
+                        AND fecha_creacion > CURRENT_DATE - INTERVAL '7 days'
+                    """, [cliente_id])
+                    ya_notificado = cursor.fetchone()[0] > 0
+                    
+                    if not ya_notificado:
+                        tipo_notificacion = 'pago_proximo'
+                        mensaje = f"🔔 Estimado {nombres} {apellidos}, se aproxima la fecha de pago de su servicio de internet. Su deuda actual es de ${deuda_actual:.2f}. Por favor acérquese a cancelar. ¡Gracias por su preferencia! - TelTec"
+                
+                # Clientes con pago vencido (30-44 días, deuda > 1 mes)
+                elif deuda_actual > precio_plan and dias_desde_registro >= 30 and dias_desde_registro < 45:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM notificaciones 
+                        WHERE cliente_id = %s 
+                        AND tipo = 'pago_vencido'
+                        AND fecha_creacion > CURRENT_DATE - INTERVAL '3 days'
+                    """, [cliente_id])
+                    ya_notificado = cursor.fetchone()[0] > 0
+                    
+                    if not ya_notificado:
+                        tipo_notificacion = 'pago_vencido'
+                        meses_impagos = int(deuda_actual / precio_plan) if precio_plan > 0 else 0
+                        mensaje = f"⚠️ Estimado {nombres} {apellidos}, su pago está vencido. Su deuda actual es de ${deuda_actual:.2f} ({meses_impagos} meses impagos). Su servicio de internet será posteriormente cortado. Acérquese a cancelar el servicio para restablecer la conexión. - TelTec"
+                
+                # Clientes con corte de servicio inminente (45+ días, deuda > 1.5 meses)
+                elif deuda_actual > (precio_plan * 1.5) and dias_desde_registro >= 45:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM notificaciones 
+                        WHERE cliente_id = %s 
+                        AND tipo = 'corte_servicio'
+                        AND fecha_creacion > CURRENT_DATE - INTERVAL '7 days'
+                    """, [cliente_id])
+                    ya_notificado = cursor.fetchone()[0] > 0
+                    
+                    if not ya_notificado:
+                        tipo_notificacion = 'corte_servicio'
+                        meses_impagos = int(deuda_actual / precio_plan) if precio_plan > 0 else 0
+                        mensaje = f"🚨 AVISO IMPORTANTE: Estimado {nombres} {apellidos}, su servicio de internet será suspendido por falta de pago. Su deuda actual es de ${deuda_actual:.2f} ({meses_impagos} meses impagos). Comuníquese inmediatamente con nosotros para evitar la suspensión. - TelTec"
+                
+                # Crear notificación si corresponde
+                if tipo_notificacion and mensaje:
+                    try:
+                        cursor.execute("""
+                            INSERT INTO notificaciones (cliente_id, tipo, mensaje, canal, estado, fecha_creacion)
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, [cliente_id, tipo_notificacion, mensaje, canal, 'pendiente', timezone.now()])
+                        notificaciones_generadas += 1
+                        logger.info(f"✅ Notificación {tipo_notificacion} creada para {nombres} {apellidos} (Deuda: ${deuda_actual:.2f})")
+                    except Exception as e:
+                        logger.error(f"❌ Error creando notificación para cliente {cliente_id}: {str(e)}")
         
+        logger.info(f"✅ Total de notificaciones generadas: {notificaciones_generadas}")
         return Response({
             'success': True,
             'message': f'Se generaron {notificaciones_generadas} notificaciones automáticas',
@@ -661,6 +975,7 @@ def generar_notificaciones_automaticas(request):
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
+        logger.error(f"❌ Error generando notificaciones automáticas: {str(e)}", exc_info=True)
         return Response({
             'success': False,
             'message': f'Error al generar notificaciones automáticas: {str(e)}'
@@ -965,47 +1280,17 @@ def notificacion_con_llamada(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def telegram_status(request):
-    """Verificar estado del bot de Telegram"""
+def whatsapp_status(request):
+    """Verificar estado del sistema de WhatsApp"""
     try:
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        if not bot_token:
-            return Response({
-                'success': False,
-                'message': 'Token de Telegram no configurado',
-                'data': {
-                    'bot_activo': False,
-                    'token_configurado': False,
-                    'webhook_configurado': False
-                }
-            }, status=status.HTTP_200_OK)
-        
-        # Verificar si el bot está activo
-        url = f"https://api.telegram.org/bot{bot_token}/getMe"
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            bot_info = response.json()
-            if bot_info.get('ok'):
-                return Response({
-                    'success': True,
-                    'message': 'Bot de Telegram activo',
-                    'data': {
-                        'bot_activo': True,
-                        'token_configurado': True,
-                        'bot_username': bot_info['result']['username'],
-                        'bot_name': bot_info['result']['first_name'],
-                        'webhook_configurado': False  # Por ahora no usamos webhooks
-                    }
-                }, status=status.HTTP_200_OK)
-        
+        # Para WhatsApp Web, siempre está disponible
         return Response({
-            'success': False,
-            'message': 'Error al verificar bot de Telegram',
+            'success': True,
+            'message': 'Sistema de WhatsApp Web disponible',
             'data': {
-                'bot_activo': False,
-                'token_configurado': True,
-                'webhook_configurado': False
+                'whatsapp_activo': True,
+                'tipo': 'whatsapp_web',
+                'descripcion': 'Redirección a WhatsApp Web para envío de mensajes'
             }
         }, status=status.HTTP_200_OK)
         
@@ -1014,60 +1299,190 @@ def telegram_status(request):
             'success': False,
             'message': f'Error: {str(e)}',
             'data': {
-                'bot_activo': False,
-                'token_configurado': False,
-                'webhook_configurado': False
+                'whatsapp_activo': False,
+                'tipo': 'error',
+                'descripcion': 'Error en el sistema'
             }
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def test_telegram_message(request):
-    """Probar envío de mensaje de Telegram"""
+def test_whatsapp_message(request):
+    """Probar envío de mensaje de WhatsApp"""
     try:
         data = request.data
-        chat_id = data.get('chat_id')
+        telefono = data.get('telefono')
         mensaje = data.get('mensaje', '🧪 Mensaje de prueba desde TelTec Net')
         
-        if not chat_id:
+        if not telefono:
             return Response({
                 'success': False,
-                'message': 'chat_id es requerido'
+                'message': 'Número de teléfono es requerido'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        if not bot_token:
+        # Limpiar el número de teléfono
+        import re
+        numero_limpio = re.sub(r'\D', '', telefono)
+        
+        # Obtener número de WhatsApp de la empresa desde configuración
+        from configuracion.models import ConfiguracionSistema
+        try:
+            empresa_whatsapp = ConfiguracionSistema.objects.get(clave='empresa_whatsapp').valor
+            # Limpiar el número de la empresa (remover espacios, guiones, etc.)
+            empresa_whatsapp_limpio = re.sub(r'\D', '', empresa_whatsapp)
+            # Si no tiene código de país, agregarlo (Ecuador: 593)
+            if not empresa_whatsapp_limpio.startswith('593'):
+                if empresa_whatsapp_limpio.startswith('0'):
+                    empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio[1:]
+                else:
+                    empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio
+        except:
+            # Fallback al número por defecto
+            empresa_whatsapp_limpio = '593984517703'
+        
+        # Crear URL de WhatsApp usando el formato de API de WhatsApp
+        mensaje_codificado = requests.utils.quote(mensaje)
+        url_whatsapp = f"https://api.whatsapp.com/send/?phone={empresa_whatsapp_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+        
+        return Response({
+            'success': True,
+            'message': 'URL de WhatsApp generada exitosamente',
+            'data': {
+                'url_whatsapp': url_whatsapp,
+                'telefono': numero_limpio,
+                'mensaje': mensaje
+            }
+        }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_whatsapp_message(request):
+    """Enviar mensaje de WhatsApp automáticamente usando API"""
+    try:
+        data = request.data
+        telefono = data.get('telefono')
+        mensaje = data.get('mensaje')
+        
+        if not all([telefono, mensaje]):
             return Response({
                 'success': False,
-                'message': 'Token de Telegram no configurado'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': 'Número de teléfono y mensaje son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        import re
+        numero_limpio = re.sub(r'\D', '', telefono)
         
-        # Enviar mensaje de prueba
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {
-            'chat_id': chat_id,
-            'text': mensaje,
-            'parse_mode': 'HTML'
-        }
+        # Verificar que el número tenga al menos 10 dígitos
+        if len(numero_limpio) < 10:
+            return Response({
+                'success': False,
+                'message': 'Número de teléfono inválido. Debe tener al menos 10 dígitos.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Configuración de WhatsApp Business API (requiere token de acceso)
+        whatsapp_token = os.getenv('WHATSAPP_BUSINESS_TOKEN')
+        whatsapp_phone_id = os.getenv('WHATSAPP_PHONE_ID')
         
-        response = requests.post(url, json=payload)
-        response_data = response.json()
-        
-        if response.status_code == 200 and response_data.get('ok'):
+        if not whatsapp_token or not whatsapp_phone_id:
+            # Si no hay configuración de API, devolver URL para envío manual usando el formato de API de WhatsApp
+            # Obtener número de WhatsApp de la empresa desde configuración
+            from configuracion.models import ConfiguracionSistema
+            try:
+                empresa_whatsapp = ConfiguracionSistema.objects.get(clave='empresa_whatsapp').valor
+                # Limpiar el número de la empresa (remover espacios, guiones, etc.)
+                empresa_whatsapp_limpio = re.sub(r'\D', '', empresa_whatsapp)
+                # Si no tiene código de país, agregarlo (Ecuador: 593)
+                if not empresa_whatsapp_limpio.startswith('593'):
+                    if empresa_whatsapp_limpio.startswith('0'):
+                        empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio[1:]
+                    else:
+                        empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio
+            except:
+                # Fallback al número por defecto
+                empresa_whatsapp_limpio = '593984517703'
+            
+            mensaje_codificado = requests.utils.quote(mensaje)
+            url_whatsapp = f"https://api.whatsapp.com/send/?phone={empresa_whatsapp_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+            
             return Response({
                 'success': True,
-                'message': 'Mensaje de prueba enviado exitosamente',
+                'message': 'WhatsApp Business API no configurado. Usando envío manual.',
                 'data': {
-                    'message_id': response_data['result']['message_id'],
-                    'chat_id': chat_id
+                    'url_whatsapp': url_whatsapp,
+                    'telefono': numero_limpio,
+                    'mensaje': mensaje,
+                    'metodo': 'manual'
+                }
+            }, status=status.HTTP_200_OK)
+        
+        # Envío automático usando WhatsApp Business API
+        url = f"https://graph.facebook.com/v17.0/{whatsapp_phone_id}/messages"
+        headers = {
+            'Authorization': f'Bearer {whatsapp_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": numero_limpio,
+            "type": "text",
+            "text": {
+                "body": mensaje
+            }
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            response_data = response.json()
+            return Response({
+                'success': True,
+                'message': 'Mensaje enviado exitosamente',
+                'data': {
+                    'telefono': numero_limpio,
+                    'mensaje': mensaje,
+                    'metodo': 'automatico',
+                    'message_id': response_data.get('messages', [{}])[0].get('id')
                 }
             }, status=status.HTTP_200_OK)
         else:
-            return Response({
-                'success': False,
-                'message': f'Error al enviar mensaje: {response_data.get("description", "Error desconocido")}'
-            }, status=status.HTTP_400_BAD_REQUEST)
+            # Si falla el envío automático, devolver URL para envío manual usando el formato de API de WhatsApp
+            # Obtener número de WhatsApp de la empresa desde configuración
+            from configuracion.models import ConfiguracionSistema
+            try:
+                empresa_whatsapp = ConfiguracionSistema.objects.get(clave='empresa_whatsapp').valor
+                # Limpiar el número de la empresa (remover espacios, guiones, etc.)
+                empresa_whatsapp_limpio = re.sub(r'\D', '', empresa_whatsapp)
+                # Si no tiene código de país, agregarlo (Ecuador: 593)
+                if not empresa_whatsapp_limpio.startswith('593'):
+                    if empresa_whatsapp_limpio.startswith('0'):
+                        empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio[1:]
+                    else:
+                        empresa_whatsapp_limpio = '593' + empresa_whatsapp_limpio
+            except:
+                # Fallback al número por defecto
+                empresa_whatsapp_limpio = '593984517703'
             
+            mensaje_codificado = requests.utils.quote(mensaje)
+            url_whatsapp = f"https://api.whatsapp.com/send/?phone={empresa_whatsapp_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+            
+            return Response({
+                'success': True,
+                'message': f'Error en envío automático: {response.text}. Usando envío manual.',
+                'data': {
+                    'url_whatsapp': url_whatsapp,
+                    'telefono': numero_limpio,
+                    'mensaje': mensaje,
+                    'metodo': 'manual'
+                }
+            }, status=status.HTTP_200_OK)
+
     except Exception as e:
         return Response({
             'success': False,
@@ -1076,16 +1491,146 @@ def test_telegram_message(request):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def telegram_estadisticas(request):
-    """Obtener estadísticas detalladas de Telegram"""
+def obtener_urls_whatsapp_pendientes(request):
+    """Obtener URLs de WhatsApp Web para notificaciones pendientes (sin API)"""
     try:
         with connection.cursor() as cursor:
-            # Total de clientes con Telegram configurado
+            cursor.execute("""
+                SELECT n.id, n.mensaje, c.telefono, c.nombres, c.apellidos
+                FROM notificaciones n
+                JOIN clientes c ON n.cliente_id = c.id
+                WHERE n.estado = 'pendiente'
+                AND n.canal = 'whatsapp'
+                AND c.telefono IS NOT NULL
+                ORDER BY n.fecha_creacion ASC
+            """)
+            
+            notificaciones = cursor.fetchall()
+        
+        urls = []
+        import re
+        
+        for notif in notificaciones:
+            notif_id, mensaje, telefono, nombres, apellidos = notif
+            
+            # Limpiar número
+            numero_limpio = re.sub(r'\D', '', telefono)
+            
+            # Agregar código de país si no lo tiene (Ecuador: 593)
+            if not numero_limpio.startswith('593'):
+                if len(numero_limpio) == 10:
+                    numero_limpio = '593' + numero_limpio
+                elif numero_limpio.startswith('0'):
+                    numero_limpio = '593' + numero_limpio[1:]
+                elif len(numero_limpio) == 9:
+                    numero_limpio = '593' + numero_limpio
+            
+            # Generar URL de WhatsApp Web
+            mensaje_codificado = requests.utils.quote(mensaje)
+            url_whatsapp = f"https://api.whatsapp.com/send/?phone={numero_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+            
+            urls.append({
+                'notificacion_id': notif_id,
+                'cliente_nombre': f"{nombres} {apellidos}",
+                'telefono': numero_limpio,
+                'url_whatsapp': url_whatsapp,
+                'mensaje': mensaje[:100] + '...' if len(mensaje) > 100 else mensaje
+            })
+        
+        return Response({
+            'success': True,
+            'message': f'Se generaron {len(urls)} URLs de WhatsApp',
+            'data': {
+                'urls': urls,
+                'total': len(urls)
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error generando URLs de WhatsApp: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error al generar URLs: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def obtener_url_whatsapp_notificacion(request, notificacion_id):
+    """Obtener URL de WhatsApp Web para una notificación específica"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT n.mensaje, c.telefono, c.nombres, c.apellidos
+                FROM notificaciones n
+                JOIN clientes c ON n.cliente_id = c.id
+                WHERE n.id = %s
+                AND n.canal = 'whatsapp'
+            """, [notificacion_id])
+            
+            notif = cursor.fetchone()
+            
+            if not notif:
+                return Response({
+                    'success': False,
+                    'message': 'Notificación no encontrada'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            mensaje, telefono, nombres, apellidos = notif
+            
+            if not telefono:
+                return Response({
+                    'success': False,
+                    'message': 'Cliente no tiene número de teléfono'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Limpiar número
+            import re
+            numero_limpio = re.sub(r'\D', '', telefono)
+            
+            # Agregar código de país si no lo tiene (Ecuador: 593)
+            if not numero_limpio.startswith('593'):
+                if len(numero_limpio) == 10:
+                    numero_limpio = '593' + numero_limpio
+                elif numero_limpio.startswith('0'):
+                    numero_limpio = '593' + numero_limpio[1:]
+                elif len(numero_limpio) == 9:
+                    numero_limpio = '593' + numero_limpio
+            
+            # Generar URL de WhatsApp Web
+            mensaje_codificado = requests.utils.quote(mensaje)
+            url_whatsapp = f"https://api.whatsapp.com/send/?phone={numero_limpio}&text={mensaje_codificado}&type=phone_number&app_absent=0"
+            
+            return Response({
+                'success': True,
+                'message': 'URL de WhatsApp generada',
+                'data': {
+                    'notificacion_id': notificacion_id,
+                    'cliente_nombre': f"{nombres} {apellidos}",
+                    'telefono': numero_limpio,
+                    'url_whatsapp': url_whatsapp,
+                    'mensaje': mensaje
+                }
+            }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        logger.error(f"Error generando URL de WhatsApp: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error al generar URL: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def whatsapp_estadisticas(request):
+    """Obtener estadísticas detalladas de WhatsApp"""
+    try:
+        with connection.cursor() as cursor:
+            # Total de clientes con teléfono configurado
             cursor.execute("""
                 SELECT 
                     COUNT(*) as total_clientes,
-                    COUNT(CASE WHEN telegram_chat_id IS NOT NULL AND telegram_chat_id != '' THEN 1 END) as con_telegram,
-                    COUNT(CASE WHEN telegram_chat_id IS NULL OR telegram_chat_id = '' THEN 1 END) as sin_telegram
+                    COUNT(CASE WHEN telefono IS NOT NULL AND telefono != '' THEN 1 END) as con_telefono,
+                    COUNT(CASE WHEN telefono IS NULL OR telefono = '' THEN 1 END) as sin_telefono
                 FROM clientes 
                 WHERE estado = 'activo'
             """)
@@ -1104,26 +1649,26 @@ def telegram_estadisticas(request):
             """)
             stats_canales = cursor.fetchall()
             
-            # Últimas notificaciones de Telegram
+            # Últimas notificaciones de WhatsApp
             cursor.execute("""
                 SELECT n.id, n.estado, n.fecha_creacion, n.fecha_envio,
                        c.nombres || ' ' || c.apellidos as cliente_nombre
                 FROM notificaciones n
                 JOIN clientes c ON n.cliente_id = c.id
-                WHERE n.canal = 'telegram'
+                WHERE n.canal = 'whatsapp'
                 ORDER BY n.fecha_creacion DESC
                 LIMIT 10
             """)
-            ultimas_telegram = cursor.fetchall()
+            ultimas_whatsapp = cursor.fetchall()
         
         return Response({
             'success': True,
             'data': {
                 'clientes': {
                     'total': stats_clientes[0],
-                    'con_telegram': stats_clientes[1],
-                    'sin_telegram': stats_clientes[2],
-                    'porcentaje_telegram': round((stats_clientes[1] / stats_clientes[0]) * 100, 2) if stats_clientes[0] > 0 else 0
+                    'con_telefono': stats_clientes[1],
+                    'sin_telefono': stats_clientes[2],
+                    'porcentaje_telefono': round((stats_clientes[1] / stats_clientes[0]) * 100, 2) if stats_clientes[0] > 0 else 0
                 },
                 'canales': [
                     {
@@ -1134,14 +1679,14 @@ def telegram_estadisticas(request):
                         'pendientes': row[4]
                     } for row in stats_canales
                 ],
-                'ultimas_telegram': [
+                'ultimas_whatsapp': [
                     {
                         'id': row[0],
                         'estado': row[1],
                         'fecha_creacion': row[2].isoformat() if row[2] else None,
                         'fecha_envio': row[3].isoformat() if row[3] else None,
                         'cliente_nombre': row[4]
-                    } for row in ultimas_telegram
+                    } for row in ultimas_whatsapp
                 ]
             }
         }, status=status.HTTP_200_OK)
@@ -1745,4 +2290,196 @@ def enviar_notificacion_individual(request, notificacion_id):
         return Response({
             'success': False,
             'message': f'Error enviando notificación: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Funciones de compatibilidad para WhatsApp
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def whatsapp_webhook(request):
+    """Webhook de WhatsApp (compatibilidad)"""
+    return Response({
+        'success': True,
+        'message': 'WhatsApp Web no requiere webhook'
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def configurar_webhook_whatsapp(request):
+    """Configurar webhook de WhatsApp (compatibilidad)"""
+    return Response({
+        'success': True,
+        'message': 'WhatsApp Web no requiere configuración de webhook'
+    }, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def obtener_updates_whatsapp(request):
+    """Obtener updates de WhatsApp (compatibilidad)"""
+    return Response({
+        'success': True,
+        'message': 'WhatsApp Web no requiere updates',
+        'data': []
+    }, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def actualizar_telefono_cliente(request):
+    """Actualizar teléfono de cliente para WhatsApp"""
+    try:
+        data = request.data
+        cliente_id = data.get('cliente_id')
+        telefono = data.get('telefono')
+        
+        if not cliente_id or not telefono:
+            return Response({
+                'success': False,
+                'message': 'cliente_id y telefono son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE clientes 
+                SET telefono = %s 
+                WHERE id = %s
+            """, [telefono, cliente_id])
+            
+            if cursor.rowcount == 0:
+                return Response({
+                    'success': False,
+                    'message': 'Cliente no encontrado'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({
+            'success': True,
+            'message': 'Teléfono actualizado exitosamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# Alias para compatibilidad con rutas esperadas
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def whatsapp_send(request):
+    """Alias para send_whatsapp_message"""
+    return send_whatsapp_message(request)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def whatsapp_test(request):
+    """Alias para test_whatsapp_message"""
+    return test_whatsapp_message(request)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def whatsapp_url_individual(request, notificacion_id):
+    """Obtener URL de WhatsApp para una notificación individual"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT n.id, n.mensaje, c.telefono, c.nombres, c.apellidos
+                FROM notificaciones n
+                JOIN clientes c ON n.cliente_id = c.id
+                WHERE n.id = %s
+            """, [notificacion_id])
+            
+            row = cursor.fetchone()
+            if not row:
+                return Response({
+                    'success': False,
+                    'message': 'Notificación no encontrada'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            notif_id, mensaje, telefono, nombres, apellidos = row
+            
+            if not telefono:
+                return Response({
+                    'success': False,
+                    'message': 'Cliente no tiene número de teléfono configurado'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            import re
+            numero_limpio = re.sub(r'\D', '', telefono)
+            if not numero_limpio.startswith('593'):
+                if len(numero_limpio) == 10:
+                    numero_limpio = '593' + numero_limpio
+                elif numero_limpio.startswith('0'):
+                    numero_limpio = '593' + numero_limpio[1:]
+            
+            mensaje_codificado = requests.utils.quote(mensaje)
+            url_whatsapp = f"https://api.whatsapp.com/send/?phone={numero_limpio}&text={mensaje_codificado}"
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'url_whatsapp': url_whatsapp,
+                    'notificacion_id': notif_id,
+                    'cliente_nombre': f"{nombres} {apellidos}",
+                    'telefono': numero_limpio
+                }
+            }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        logger.error(f"Error obteniendo URL de WhatsApp: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def whatsapp_urls_pendientes(request):
+    """Obtener URLs de WhatsApp para todas las notificaciones pendientes"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT n.id, n.mensaje, c.telefono, c.nombres, c.apellidos
+                FROM notificaciones n
+                JOIN clientes c ON n.cliente_id = c.id
+                WHERE n.estado = 'pendiente'
+                AND n.canal = 'whatsapp'
+                AND c.telefono IS NOT NULL
+                AND c.telefono != ''
+                ORDER BY n.fecha_creacion ASC
+                LIMIT 200
+            """)
+            
+            urls = []
+            import re
+            for row in cursor.fetchall():
+                notif_id, mensaje, telefono, nombres, apellidos = row
+                numero_limpio = re.sub(r'\D', '', telefono)
+                if not numero_limpio.startswith('593'):
+                    if len(numero_limpio) == 10:
+                        numero_limpio = '593' + numero_limpio
+                    elif numero_limpio.startswith('0'):
+                        numero_limpio = '593' + numero_limpio[1:]
+                
+                mensaje_codificado = requests.utils.quote(mensaje)
+                url_whatsapp = f"https://api.whatsapp.com/send/?phone={numero_limpio}&text={mensaje_codificado}"
+                
+                urls.append({
+                    'notificacion_id': notif_id,
+                    'url_whatsapp': url_whatsapp,
+                    'cliente_nombre': f"{nombres} {apellidos}",
+                    'telefono': numero_limpio,
+                    'mensaje': mensaje
+                })
+            
+            return Response({
+                'success': True,
+                'data': {
+                    'urls': urls,
+                    'total': len(urls)
+                }
+            }, status=status.HTTP_200_OK)
+            
+    except Exception as e:
+        logger.error(f"Error obteniendo URLs de WhatsApp: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

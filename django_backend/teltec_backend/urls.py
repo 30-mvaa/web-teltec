@@ -24,6 +24,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', lambda request: HttpResponse("¡Servidor Django activo!"), name='inicio'),
+    path('', include('deudas.urls')),  # Mover deudas antes que pagos
     path('', include('clientes.urls')),
     path('', include('pagos.urls')),
     path('', include('gastos.urls')),
@@ -31,8 +32,11 @@ urlpatterns = [
     path('', include('sitio_web.urls')),
     path('', include('reportes_app.urls')),
     path('', include('configuracion.urls')),
+    path('', include('sectores_app.urls')),
+    path('', include('planes_app.urls')),
     path('api/auth/', include('usuarios.urls')),
-    path('', include('usuarios.urls'))
+    path('', include('usuarios.urls')),
+    path('', include('chatbot.urls'))
 ]
 
 # Servir archivos media en desarrollo

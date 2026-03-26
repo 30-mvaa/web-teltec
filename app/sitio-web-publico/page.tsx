@@ -145,7 +145,7 @@ export default function SitioWebPublicoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col overflow-x-hidden" role="document">
+    <div className="min-h-screen bg-slate-900 text-gray-900 flex flex-col overflow-x-hidden" role="document">
       <SkipLink />
 
       {/* SEO: JSON‑LD de organización y búsqueda de sitelinks */}
@@ -189,9 +189,13 @@ export default function SitioWebPublicoPage() {
       <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
       {/* Main content */}
-      <main id="contenido" className="isolate">
+      <main id="contenido" className="isolate pt-20">
         {/* Hero */}
-        <Hero isVisible={isVisible} />
+        <Hero 
+          informacion={sitioWeb?.informacion} 
+          empresa={sitioWeb?.empresa} 
+          isVisible={isVisible} 
+        />
 
         {/* Mensaje de error si el backend falló */}
         {error && <ErrorNotice message={String(error)} />}
@@ -205,7 +209,11 @@ export default function SitioWebPublicoPage() {
       </main>
 
       {/* Footer */}
-      <Footer />
+      <Footer 
+        empresa={sitioWeb?.empresa} 
+        contactos={contactos} 
+        redesSociales={redesSociales} 
+      />
 
       {/* Botón flotante WhatsApp */}
       <WhatsAppButton />

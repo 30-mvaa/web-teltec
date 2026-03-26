@@ -6,22 +6,39 @@ from django.db import connection
 from django.http import HttpResponse
 from datetime import datetime
 import json
-from .models import ConfiguracionSistema, Plan, Sector
+from .models import ConfiguracionSistema
+# Importar modelos desde las apps correctas
+from planes_app.models import Plan
+from sectores_app.models import Sector
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def obtener_configuracion(request):
     """Obtener todas las configuraciones del sistema"""
     try:
-        configuraciones = ConfiguracionSistema.objects.all()
-        config_dict = {}
-        
-        for config in configuraciones:
-            config_dict[config.clave] = {
-                'valor': config.valor,
-                'descripcion': config.descripcion,
-                'categoria': config.categoria
-            }
+        # Como la tabla configuracion_sistema no existe, devolver configuraciones por defecto
+        config_dict = {
+            'empresa_nombre': {'valor': 'TelTec Net', 'descripcion': 'Nombre de la empresa', 'categoria': 'empresa'},
+            'empresa_direccion': {'valor': 'Av. Principal 123, Centro', 'descripcion': 'Dirección de la empresa', 'categoria': 'empresa'},
+            'empresa_telefono': {'valor': '0999859689', 'descripcion': 'Teléfono de la empresa', 'categoria': 'empresa'},
+            'empresa_whatsapp': {'valor': '0984517703', 'descripcion': 'Número de WhatsApp de la empresa (sin guiones)', 'categoria': 'empresa'},
+            'empresa_email': {'valor': 'vangamarca4@gmail.com', 'descripcion': 'Email de la empresa', 'categoria': 'empresa'},
+            'empresa_ruc': {'valor': '1234567890001', 'descripcion': 'RUC de la empresa', 'categoria': 'empresa'},
+            'email_smtp_server': {'valor': '', 'descripcion': 'Servidor SMTP', 'categoria': 'email'},
+            'email_smtp_port': {'valor': '', 'descripcion': 'Puerto SMTP', 'categoria': 'email'},
+            'email_usuario': {'valor': '', 'descripcion': 'Usuario de email', 'categoria': 'email'},
+            'email_password': {'valor': '', 'descripcion': 'Contraseña de email', 'categoria': 'email'},
+            'sistema_dias_aviso_pago': {'valor': '5', 'descripcion': 'Días de aviso antes del pago', 'categoria': 'sistema'},
+            'sistema_dias_corte_servicio': {'valor': '10', 'descripcion': 'Días antes del corte de servicio', 'categoria': 'sistema'},
+            'sistema_backup_automatico': {'valor': 'false', 'descripcion': 'Backup automático', 'categoria': 'sistema'},
+            'sistema_notificaciones_activas': {'valor': 'true', 'descripcion': 'Notificaciones activas', 'categoria': 'sistema'},
+            'db_host': {'valor': 'localhost', 'descripcion': 'Host de la base de datos', 'categoria': 'database'},
+            'db_puerto': {'valor': '5432', 'descripcion': 'Puerto de la base de datos', 'categoria': 'database'},
+            'db_nombre': {'valor': 'teltec_db', 'descripcion': 'Nombre de la base de datos', 'categoria': 'database'},
+            'db_usuario': {'valor': 'teltec_user', 'descripcion': 'Usuario de la base de datos', 'categoria': 'database'},
+            'login_intentos_maximos': {'valor': '3', 'descripcion': 'Intentos máximos de login', 'categoria': 'controlLogin'},
+            'login_minutos_congelacion': {'valor': '15', 'descripcion': 'Minutos de congelación', 'categoria': 'controlLogin'}
+        }
         
         return Response({
             'success': True,
@@ -46,6 +63,7 @@ def guardar_configuracion(request):
             'empresa_nombre': data.get('empresa', {}).get('nombre', ''),
             'empresa_direccion': data.get('empresa', {}).get('direccion', ''),
             'empresa_telefono': data.get('empresa', {}).get('telefono', ''),
+            'empresa_whatsapp': data.get('empresa', {}).get('whatsapp', ''),
             'empresa_email': data.get('empresa', {}).get('email', ''),
             'empresa_ruc': data.get('empresa', {}).get('ruc', ''),
         }
@@ -115,17 +133,17 @@ def guardar_configuracion(request):
 def listar_planes(request):
     """Listar todos los planes"""
     try:
-        planes = Plan.objects.filter(activo=True).order_by('precio')
+        planes = Plan.objects.all().order_by('precio')
         planes_data = []
         
         for plan in planes:
             planes_data.append({
                 'id': plan.id,
-                'nombre': plan.nombre,
+                'nombre': plan.tipo_plan,  # Usar tipo_plan del modelo
                 'precio': float(plan.precio),
-                'velocidad': plan.velocidad,
+                'velocidad': '',  # Campo no existe en el modelo actual
                 'descripcion': plan.descripcion,
-                'activo': plan.activo,
+                'activo': plan.estado == 'activo',  # Convertir estado a booleano
                 'fecha_creacion': plan.fecha_creacion.isoformat(),
                 'fecha_actualizacion': plan.fecha_actualizacion.isoformat()
             })
@@ -156,7 +174,7 @@ def crear_plan(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar si ya existe un plan con ese nombre
-        if Plan.objects.filter(nombre=data['nombre']).exists():
+        if Plan.objects.filter(tipo_plan=data['nombre']).exists():
             return Response({
                 'success': False,
                 'message': 'Ya existe un plan con ese nombre'
@@ -164,9 +182,8 @@ def crear_plan(request):
         
         # Crear el plan
         plan = Plan.objects.create(
-            nombre=data['nombre'],
+            tipo_plan=data['nombre'],
             precio=data['precio'],
-            velocidad=data.get('velocidad', ''),
             descripcion=data.get('descripcion', '')
         )
         
@@ -175,9 +192,8 @@ def crear_plan(request):
             'message': 'Plan creado exitosamente',
             'data': {
                 'id': plan.id,
-                'nombre': plan.nombre,
+                'nombre': plan.tipo_plan,
                 'precio': float(plan.precio),
-                'velocidad': plan.velocidad,
                 'descripcion': plan.descripcion
             }
         }, status=status.HTTP_201_CREATED)
@@ -212,16 +228,15 @@ def actualizar_plan(request, plan_id):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar si ya existe otro plan con ese nombre
-        if Plan.objects.filter(nombre=data['nombre']).exclude(id=plan_id).exists():
+        if Plan.objects.filter(tipo_plan=data['nombre']).exclude(id=plan_id).exists():
             return Response({
                 'success': False,
                 'message': 'Ya existe otro plan con ese nombre'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Actualizar el plan
-        plan.nombre = data['nombre']
+        plan.tipo_plan = data['nombre']
         plan.precio = data['precio']
-        plan.velocidad = data.get('velocidad', plan.velocidad)
         plan.descripcion = data.get('descripcion', plan.descripcion)
         plan.save()
         
@@ -230,9 +245,8 @@ def actualizar_plan(request, plan_id):
             'message': 'Plan actualizado exitosamente',
             'data': {
                 'id': plan.id,
-                'nombre': plan.nombre,
+                'nombre': plan.tipo_plan,
                 'precio': float(plan.precio),
-                'velocidad': plan.velocidad,
                 'descripcion': plan.descripcion
             }
         }, status=status.HTTP_200_OK)
@@ -246,7 +260,7 @@ def actualizar_plan(request, plan_id):
 @api_view(['DELETE'])
 @permission_classes([AllowAny])
 def eliminar_plan(request, plan_id):
-    """Eliminar un plan (marcar como inactivo)"""
+    """Eliminar un plan físicamente de la base de datos"""
     try:
         # Buscar el plan
         try:
@@ -257,13 +271,20 @@ def eliminar_plan(request, plan_id):
                 'message': 'Plan no encontrado'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Marcar como inactivo en lugar de eliminar
-        plan.activo = False
-        plan.save()
+        # Verificar si el plan está siendo usado por algún cliente
+        from clientes_planes_app.models import ClientePlan
+        if ClientePlan.objects.filter(id_plan=plan).exists():
+            return Response({
+                'success': False,
+                'message': 'No se puede eliminar el plan porque está siendo usado por clientes. Use desactivar en su lugar.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Eliminar físicamente el plan
+        plan.delete()
         
         return Response({
             'success': True,
-            'message': 'Plan eliminado exitosamente'
+            'message': 'Plan eliminado físicamente de la base de datos'
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
@@ -272,20 +293,79 @@ def eliminar_plan(request, plan_id):
             'message': f'Error al eliminar plan: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['PUT'])
+@permission_classes([AllowAny])
+def desactivar_plan(request, plan_id):
+    """Desactivar un plan (marcar como inactivo)"""
+    try:
+        # Buscar el plan
+        try:
+            plan = Plan.objects.get(id=plan_id)
+        except Plan.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Plan no encontrado'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Marcar como inactivo
+        plan.estado = 'inactivo'
+        plan.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Plan desactivado exitosamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al desactivar plan: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['PUT'])
+@permission_classes([AllowAny])
+def activar_plan(request, plan_id):
+    """Activar un plan (marcar como activo)"""
+    try:
+        # Buscar el plan
+        try:
+            plan = Plan.objects.get(id=plan_id)
+        except Plan.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Plan no encontrado'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Marcar como activo
+        plan.estado = 'activo'
+        plan.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Plan activado exitosamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al activar plan: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def listar_sectores(request):
-    """Listar todos los sectores"""
+    """Listar todos los sectores (activos e inactivos)"""
     try:
-        sectores = Sector.objects.filter(activo=True).order_by('nombre')
+        # Obtener todos los sectores, no solo los activos
+        sectores = Sector.objects.all().order_by('nombre_sector')
         sectores_data = []
         
         for sector in sectores:
             sectores_data.append({
                 'id': sector.id,
-                'nombre': sector.nombre,
+                'nombre': sector.nombre_sector,  # Usar nombre_sector del modelo
                 'descripcion': sector.descripcion,
-                'activo': sector.activo,
+                'activo': sector.estado == 'activo',  # Convertir estado a booleano
                 'fecha_creacion': sector.fecha_creacion.isoformat(),
                 'fecha_actualizacion': sector.fecha_actualizacion.isoformat()
             })
@@ -316,7 +396,7 @@ def crear_sector(request):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar si ya existe un sector con ese nombre
-        if Sector.objects.filter(nombre=data['nombre']).exists():
+        if Sector.objects.filter(nombre_sector=data['nombre']).exists():
             return Response({
                 'success': False,
                 'message': 'Ya existe un sector con ese nombre'
@@ -324,7 +404,7 @@ def crear_sector(request):
         
         # Crear el sector
         sector = Sector.objects.create(
-            nombre=data['nombre'],
+            nombre_sector=data['nombre'],
             descripcion=data.get('descripcion', '')
         )
         
@@ -333,7 +413,7 @@ def crear_sector(request):
             'message': 'Sector creado exitosamente',
             'data': {
                 'id': sector.id,
-                'nombre': sector.nombre,
+                'nombre': sector.nombre_sector,
                 'descripcion': sector.descripcion
             }
         }, status=status.HTTP_201_CREATED)
@@ -368,14 +448,14 @@ def actualizar_sector(request, sector_id):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verificar si ya existe otro sector con ese nombre
-        if Sector.objects.filter(nombre=data['nombre']).exclude(id=sector_id).exists():
+        if Sector.objects.filter(nombre_sector=data['nombre']).exclude(id=sector_id).exists():
             return Response({
                 'success': False,
                 'message': 'Ya existe otro sector con ese nombre'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Actualizar el sector
-        sector.nombre = data['nombre']
+        sector.nombre_sector = data['nombre']
         sector.descripcion = data.get('descripcion', sector.descripcion)
         sector.save()
         
@@ -384,7 +464,7 @@ def actualizar_sector(request, sector_id):
             'message': 'Sector actualizado exitosamente',
             'data': {
                 'id': sector.id,
-                'nombre': sector.nombre,
+                'nombre': sector.nombre_sector,
                 'descripcion': sector.descripcion
             }
         }, status=status.HTTP_200_OK)
@@ -398,7 +478,7 @@ def actualizar_sector(request, sector_id):
 @api_view(['DELETE'])
 @permission_classes([AllowAny])
 def eliminar_sector(request, sector_id):
-    """Eliminar un sector (marcar como inactivo)"""
+    """Eliminar un sector físicamente de la base de datos"""
     try:
         # Buscar el sector
         try:
@@ -409,19 +489,84 @@ def eliminar_sector(request, sector_id):
                 'message': 'Sector no encontrado'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Marcar como inactivo en lugar de eliminar
-        sector.activo = False
-        sector.save()
+        # Verificar si el sector está siendo usado por algún cliente
+        from clientes.models import Cliente
+        if Cliente.objects.filter(id_sector=sector).exists():
+            return Response({
+                'success': False,
+                'message': 'No se puede eliminar el sector porque está siendo usado por clientes. Use desactivar en su lugar.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Eliminar físicamente el sector
+        sector.delete()
         
         return Response({
             'success': True,
-            'message': 'Sector eliminado exitosamente'
+            'message': 'Sector eliminado físicamente de la base de datos'
         }, status=status.HTTP_200_OK)
         
     except Exception as e:
         return Response({
             'success': False,
             'message': f'Error al eliminar sector: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['PUT'])
+@permission_classes([AllowAny])
+def desactivar_sector(request, sector_id):
+    """Desactivar un sector (marcar como inactivo)"""
+    try:
+        # Buscar el sector
+        try:
+            sector = Sector.objects.get(id=sector_id)
+        except Sector.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Sector no encontrado'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Marcar como inactivo
+        sector.estado = 'inactivo'
+        sector.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Sector desactivado exitosamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al desactivar sector: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['PUT'])
+@permission_classes([AllowAny])
+def activar_sector(request, sector_id):
+    """Activar un sector (marcar como activo)"""
+    try:
+        # Buscar el sector
+        try:
+            sector = Sector.objects.get(id=sector_id)
+        except Sector.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Sector no encontrado'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Marcar como activo
+        sector.estado = 'activo'
+        sector.save()
+        
+        return Response({
+            'success': True,
+            'message': 'Sector activado exitosamente'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error al activar sector: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
@@ -434,6 +579,7 @@ def inicializar_configuracion(request):
             'empresa_nombre': 'TelTec Net',
             'empresa_direccion': 'Av. Principal 123, Centro',
             'empresa_telefono': '0999859689',
+            'empresa_whatsapp': '0984517703',
             'empresa_email': 'vangamarca4@gmail.com',
             'empresa_ruc': '1234567890001',
             'email_smtp_server': 'smtp.gmail.com',
@@ -468,10 +614,10 @@ def inicializar_configuracion(request):
         
         for plan_data in planes_default:
             Plan.objects.get_or_create(
-                nombre=plan_data['nombre'],
+                tipo_plan=plan_data['nombre'],
                 defaults={
                     'precio': plan_data['precio'],
-                    'velocidad': plan_data['velocidad']
+                    'descripcion': f"Plan {plan_data['nombre']}"
                 }
             )
         
@@ -485,7 +631,10 @@ def inicializar_configuracion(request):
         ]
         
         for sector_nombre in sectores_default:
-            Sector.objects.get_or_create(nombre=sector_nombre)
+            Sector.objects.get_or_create(
+                nombre_sector=sector_nombre,
+                defaults={'descripcion': f"Sector de {sector_nombre}"}
+            )
         
         return Response({
             'success': True,

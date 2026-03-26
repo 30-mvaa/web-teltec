@@ -23,52 +23,29 @@ class UsuarioService:
     def authenticate_user(email, password):
         """Autenticar usuario"""
         try:
-            # Usar psql para conectar a PostgreSQL
-            import subprocess
-            import json
+            # Usar conexión de Django directamente para evitar SQL injection
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT id, email, nombre, rol, activo, password_hash
+                    FROM usuarios 
+                    WHERE email = %s AND activo = true
+                """, [email])
+                user_data = cursor.fetchone()
             
-            # Comando para obtener datos del usuario
-            cmd = [
-                'psql', '-h', 'localhost', '-p', '5432', '-U', 'teltec_user', 
-                '-d', 'teltec_db', '-t', '-c',
-                f"SELECT json_build_object('id', id, 'email', email, 'nombre', nombre, 'rol', rol, 'activo', activo, 'password_hash', password_hash) FROM usuarios WHERE email = '{email}' AND activo = true;"
-            ]
-            
-            # Configurar variables de entorno para la contraseña
-            env = os.environ.copy()
-            env['PGPASSWORD'] = '12345678'
-            
-            # Ejecutar comando
-            result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-            
-            if result.returncode != 0:
-                print(f"Error ejecutando psql: {result.stderr}")
+            if not user_data:
                 return None
             
-            # Procesar resultado
-            output = result.stdout.strip()
-            if not output or output == '(0 rows)':
-                print(f"Usuario no encontrado: {email}")
-                return None
-            
-            # Parsear JSON
-            try:
-                user_data = json.loads(output)
-            except json.JSONDecodeError:
-                print(f"Error parseando JSON: {output}")
-                return None
+            user_id, user_email, nombre, rol, activo, password_hash = user_data
             
             # Verificar contraseña usando bcrypt
-            if bcrypt.checkpw(password.encode('utf-8'), user_data['password_hash'].encode('utf-8')):
+            if password_hash and bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8')):
                 return {
-                    'id': user_data['id'],
-                    'email': user_data['email'],
-                    'nombre': user_data['nombre'],
-                    'rol': user_data['rol'],
-                    'activo': user_data['activo']
+                    'id': user_id,
+                    'email': user_email,
+                    'nombre': nombre,
+                    'rol': rol,
+                    'activo': activo
                 }
-            else:
-                print(f"Contraseña incorrecta para: {email}")
             
             return None
             
@@ -80,27 +57,14 @@ class UsuarioService:
     def get_user_info(email):
         """Obtener información del usuario"""
         try:
-            # Usar conexión directa a PostgreSQL
-            import psycopg2
-            
-            conn = psycopg2.connect(
-                host='localhost',
-                port='5432',
-                database='teltec_db',
-                user='teltec_user',
-                password='12345678'
-            )
-            cursor = conn.cursor()
-            
-            cursor.execute("""
-                SELECT id, email, nombre, rol, activo 
-                FROM usuarios 
-                WHERE email = %s AND activo = true
-            """, [email])
-            user_data = cursor.fetchone()
-            
-            cursor.close()
-            conn.close()
+            # Usar conexión de Django en lugar de psycopg2 directo
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT id, email, nombre, rol, activo 
+                    FROM usuarios 
+                    WHERE email = %s AND activo = true
+                """, [email])
+                user_data = cursor.fetchone()
             
             if not user_data:
                 return None
@@ -154,28 +118,37 @@ class UsuarioService:
             updates = []
             params = []
             
+            # Construir updates de forma segura con validación
             if nombre is not None:
                 updates.append("nombre = %s")
                 params.append(nombre)
             
             if rol is not None:
+                # Validar que el rol sea válido
+                valid_roles = ['administrador', 'economia', 'atencion_cliente']
+                if rol not in valid_roles:
+                    return False, f"Rol inválido. Roles permitidos: {', '.join(valid_roles)}"
                 updates.append("rol = %s")
                 params.append(rol)
             
             if activo is not None:
+                # Validar que activo sea booleano
+                if not isinstance(activo, bool):
+                    activo = str(activo).lower() == 'true'
                 updates.append("activo = %s")
                 params.append(activo)
             
             if not updates:
                 return False, "No hay campos para actualizar"
             
-            updates.append("fecha_actualizacion = NOW()")
             params.append(user_id)
             
             with connection.cursor() as cursor:
+                # Construir query de forma segura
+                set_clause = ', '.join(updates)
                 cursor.execute(f"""
                     UPDATE usuarios 
-                    SET {', '.join(updates)}
+                    SET {set_clause}, fecha_actualizacion = NOW()
                     WHERE id = %s
                 """, params)
             

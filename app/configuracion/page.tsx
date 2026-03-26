@@ -18,6 +18,7 @@ export default function ConfiguracionPage() {
       nombre: "TelTec Net",
       direccion: "Av. Principal 123, Centro",
       telefono: "0999859689",
+      whatsapp: "0984517703",
       email: "vangamarca4@gmail.com",
       ruc: "1234567890001",
     },
@@ -54,6 +55,8 @@ export default function ConfiguracionPage() {
   const [editingSector, setEditingSector] = useState<any>(null)
   const [planForm, setPlanForm] = useState({ nombre: '', precio: '', velocidad: '', descripcion: '' })
   const [sectorForm, setSectorForm] = useState({ nombre: '', descripcion: '' })
+  const [showInactivePlanes, setShowInactivePlanes] = useState(false)
+  const [showInactiveSectores, setShowInactiveSectores] = useState(false)
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -85,6 +88,7 @@ export default function ConfiguracionPage() {
         case "empresa_nombre": mapped.empresa.nombre = item.valor; break;
         case "empresa_direccion": mapped.empresa.direccion = item.valor; break;
         case "empresa_telefono": mapped.empresa.telefono = item.valor; break;
+        case "empresa_whatsapp": mapped.empresa.whatsapp = item.valor; break;
         case "empresa_email": mapped.empresa.email = item.valor; break;
         case "empresa_ruc": mapped.empresa.ruc = item.valor; break;
         case "email_smtp_server": mapped.email.smtp_server = item.valor; break;
@@ -113,6 +117,7 @@ export default function ConfiguracionPage() {
       { clave: "empresa_nombre", valor: config.empresa.nombre },
       { clave: "empresa_direccion", valor: config.empresa.direccion },
       { clave: "empresa_telefono", valor: config.empresa.telefono },
+      { clave: "empresa_whatsapp", valor: config.empresa.whatsapp || '' },
       { clave: "empresa_email", valor: config.empresa.email },
       { clave: "empresa_ruc", valor: config.empresa.ruc },
       { clave: "email_smtp_server", valor: config.email.smtp_server },
@@ -325,13 +330,13 @@ export default function ConfiguracionPage() {
   }
 
   const handleEliminarPlan = async (planId: number) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este plan?')) {
+    if (confirm('¿Estás seguro de que quieres ELIMINAR FÍSICAMENTE este plan de la base de datos? Esta acción no se puede deshacer.')) {
       try {
         const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES_ELIMINAR(planId), {
           method: 'DELETE'
         })
         if (response.success) {
-          setMessage('Plan eliminado exitosamente')
+          setMessage('Plan eliminado físicamente de la base de datos')
           // Recargar planes desde la base de datos
           const planesResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES)
           if (planesResponse.success) {
@@ -342,6 +347,50 @@ export default function ConfiguracionPage() {
         }
       } catch (error) {
         setMessage('Error al eliminar el plan')
+      }
+    }
+  }
+
+  const handleDesactivarPlan = async (planId: number) => {
+    if (confirm('¿Estás seguro de que quieres desactivar este plan? El plan se marcará como inactivo pero permanecerá en la base de datos.')) {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES_DESACTIVAR(planId), {
+          method: 'PUT'
+        })
+        if (response.success) {
+          setMessage('Plan desactivado exitosamente')
+          // Recargar planes desde la base de datos
+          const planesResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES)
+          if (planesResponse.success) {
+            setPlanes(planesResponse.data)
+          }
+        } else {
+          setMessage(`Error: ${response.message}`)
+        }
+      } catch (error) {
+        setMessage('Error al desactivar el plan')
+      }
+    }
+  }
+
+  const handleActivarPlan = async (planId: number) => {
+    if (confirm('¿Estás seguro de que quieres activar este plan? El plan estará disponible para los clientes.')) {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES_ACTIVAR(planId), {
+          method: 'PUT'
+        })
+        if (response.success) {
+          setMessage('Plan activado exitosamente')
+          // Recargar planes desde la base de datos
+          const planesResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_PLANES)
+          if (planesResponse.success) {
+            setPlanes(planesResponse.data)
+          }
+        } else {
+          setMessage(`Error: ${response.message}`)
+        }
+      } catch (error) {
+        setMessage('Error al activar el plan')
       }
     }
   }
@@ -396,13 +445,13 @@ export default function ConfiguracionPage() {
   }
 
   const handleEliminarSector = async (sectorId: number) => {
-    if (confirm('¿Estás seguro de que quieres eliminar este sector?')) {
+    if (confirm('¿Estás seguro de que quieres ELIMINAR FÍSICAMENTE este sector de la base de datos? Esta acción no se puede deshacer.')) {
       try {
         const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES_ELIMINAR(sectorId), {
           method: 'DELETE'
         })
         if (response.success) {
-          setMessage('Sector eliminado exitosamente')
+          setMessage('Sector eliminado físicamente de la base de datos')
           // Recargar sectores desde la base de datos
           const sectoresResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES)
           if (sectoresResponse.success) {
@@ -413,6 +462,50 @@ export default function ConfiguracionPage() {
         }
       } catch (error) {
         setMessage('Error al eliminar el sector')
+      }
+    }
+  }
+
+  const handleDesactivarSector = async (sectorId: number) => {
+    if (confirm('¿Estás seguro de que quieres desactivar este sector? El sector se marcará como inactivo pero permanecerá en la base de datos.')) {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES_DESACTIVAR(sectorId), {
+          method: 'PUT'
+        })
+        if (response.success) {
+          setMessage('Sector desactivado exitosamente')
+          // Recargar sectores desde la base de datos
+          const sectoresResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES)
+          if (sectoresResponse.success) {
+            setSectores(sectoresResponse.data)
+          }
+        } else {
+          setMessage(`Error: ${response.message}`)
+        }
+      } catch (error) {
+        setMessage('Error al desactivar el sector')
+      }
+    }
+  }
+
+  const handleActivarSector = async (sectorId: number) => {
+    if (confirm('¿Estás seguro de que quieres activar este sector? El sector estará disponible para los clientes.')) {
+      try {
+        const response = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES_ACTIVAR(sectorId), {
+          method: 'PUT'
+        })
+        if (response.success) {
+          setMessage('Sector activado exitosamente')
+          // Recargar sectores desde la base de datos
+          const sectoresResponse = await apiRequest(API_ENDPOINTS.CONFIGURACION_SECTORES)
+          if (sectoresResponse.success) {
+            setSectores(sectoresResponse.data)
+          }
+        } else {
+          setMessage(`Error: ${response.message}`)
+        }
+      } catch (error) {
+        setMessage('Error al activar el sector')
       }
     }
   }
@@ -456,7 +549,7 @@ export default function ConfiguracionPage() {
           )}
 
           <Tabs defaultValue="empresa" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5 bg-white/50 backdrop-blur-sm">
+            <TabsList className="grid w-full grid-cols-6 bg-white/50 backdrop-blur-sm">
               <TabsTrigger value="empresa" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
                 Empresa
               </TabsTrigger>
@@ -470,7 +563,10 @@ export default function ConfiguracionPage() {
                 Base de Datos
               </TabsTrigger>
               <TabsTrigger value="planes" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-                Planes y Sectores
+                Planes
+              </TabsTrigger>
+              <TabsTrigger value="sectores" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                Sectores
               </TabsTrigger>
             </TabsList>
 
@@ -557,6 +653,27 @@ export default function ConfiguracionPage() {
                       />
                       {errors['empresa_telefono'] && <div className="text-red-600 text-xs mt-1">{errors['empresa_telefono']}</div>}
                     </div>
+                    <div>
+                      <Label htmlFor="whatsapp_empresa" className="text-slate-700 font-medium">
+                        WhatsApp (Número de envío)
+                      </Label>
+                      <Input
+                        id="whatsapp_empresa"
+                        value={config.empresa.whatsapp || ''}
+                        placeholder="0984517703"
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            empresa: { ...config.empresa, whatsapp: e.target.value.replace(/\D/g, '') },
+                          })
+                        }
+                        className="mt-2 border-slate-200 focus:border-indigo-500"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Número desde el cual se envían los mensajes a los clientes</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="email_empresa" className="text-slate-700 font-medium">
                         Email
@@ -944,34 +1061,59 @@ export default function ConfiguracionPage() {
               </Card>
             </TabsContent>
 
-            {/* Pestaña de Planes y Sectores */}
+            {/* Pestaña de Planes */}
             <TabsContent value="planes" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Sección de Planes */}
-                <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-lg">
-                    <CardTitle className="flex items-center space-x-2">
-                      <Package className="h-5 w-5" />
-                      <span>Gestión de Planes de Internet</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {/* Lista de planes desde la base de datos */}
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {planes.map((plan: any) => (
-                          <div key={plan.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900">{plan.nombre}</h4>
-                              <div className="flex items-center space-x-4 text-sm text-slate-600">
-                                <span>{plan.velocidad}</span>
-                                <span className="font-medium text-emerald-600">${plan.precio}</span>
-        </div>
-                              {plan.descripcion && (
-                                <p className="text-sm text-slate-500 mt-1">{plan.descripcion}</p>
-                              )}
-      </div>
+              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-lg">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Package className="h-5 w-5" />
+                    <span>Gestión de Planes de Internet</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {/* Filtro para mostrar planes inactivos */}
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="show-inactive-planes"
+                        checked={showInactivePlanes}
+                        onCheckedChange={setShowInactivePlanes}
+                      />
+                      <Label htmlFor="show-inactive-planes">Mostrar planes inactivos</Label>
+                    </div>
+                    
+                    {/* Lista de planes desde la base de datos */}
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {planes
+                        .filter((plan: any) => showInactivePlanes || plan.activo)
+                        .map((plan: any) => (
+                        <div key={plan.id} className={`flex items-center justify-between p-4 rounded-lg border ${
+                          plan.activo 
+                            ? 'bg-slate-50 border-slate-200' 
+                            : 'bg-red-50 border-red-200 opacity-75'
+                        }`}>
+                          <div className="flex-1">
                             <div className="flex items-center space-x-2">
+                              <h4 className={`font-semibold ${plan.activo ? 'text-slate-900' : 'text-red-700'}`}>
+                                {plan.nombre}
+                              </h4>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                plan.activo 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {plan.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-4 text-sm text-slate-600">
+                              <span>{plan.velocidad}</span>
+                              <span className="font-medium text-emerald-600">${plan.precio}</span>
+                            </div>
+                            {plan.descripcion && (
+                              <p className="text-sm text-slate-500 mt-1">{plan.descripcion}</p>
+                            )}
+                          </div>
+                                                      <div className="flex items-center space-x-2">
                               <Button
                                 onClick={() => {
                                   setEditingPlan(plan)
@@ -991,6 +1133,27 @@ export default function ConfiguracionPage() {
                                 Editar
                               </Button>
                               <Button
+                                onClick={() => plan.activo ? handleDesactivarPlan(plan.id) : handleActivarPlan(plan.id)}
+                                size="sm"
+                                variant="outline"
+                                className={plan.activo 
+                                  ? "border-yellow-300 text-yellow-600 hover:bg-yellow-50"
+                                  : "border-green-300 text-green-600 hover:bg-green-50"
+                                }
+                              >
+                                {plan.activo ? (
+                                  <>
+                                    <X className="h-4 w-4 mr-1" />
+                                    Desactivar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Activar
+                                  </>
+                                )}
+                              </Button>
+                              <Button
                                 onClick={() => handleEliminarPlan(plan.id)}
                                 size="sm"
                                 variant="outline"
@@ -999,48 +1162,77 @@ export default function ConfiguracionPage() {
                                 <Trash2 className="h-4 w-4 mr-1" />
                                 Eliminar
                               </Button>
-        </div>
-    </div>
-                        ))}
-                      </div>
-
-                      {/* Botón para agregar plan */}
-                      <Button
-                        onClick={() => {
-                          setEditingPlan(null)
-                          setPlanForm({ nombre: '', precio: '', velocidad: '', descripcion: '' })
-                          setShowPlanModal(true)
-                        }}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Agregar Plan
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Sección de Sectores */}
-                <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
-                  <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-lg">
-                    <CardTitle className="flex items-center space-x-2">
-                      <MapPin className="h-5 w-5" />
-                      <span>Gestión de Sectores de Cobertura</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      {/* Lista de sectores desde la base de datos */}
-                      <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {sectores.map((sector: any) => (
-                          <div key={sector.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-slate-900">{sector.nombre}</h4>
-                              {sector.descripcion && (
-                                <p className="text-sm text-slate-500 mt-1">{sector.descripcion}</p>
-                              )}
                             </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Botón para agregar plan */}
+                    <Button
+                      onClick={() => {
+                        setEditingPlan(null)
+                        setPlanForm({ nombre: '', precio: '', velocidad: '', descripcion: '' })
+                        setShowPlanModal(true)
+                      }}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Plan
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Pestaña de Sectores */}
+            <TabsContent value="sectores" className="space-y-6">
+              <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl">
+                <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-lg">
+                  <CardTitle className="flex items-center space-x-2">
+                    <MapPin className="h-5 w-5" />
+                    <span>Gestión de Sectores de Cobertura</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {/* Filtro para mostrar sectores inactivos */}
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="show-inactive-sectores"
+                        checked={showInactiveSectores}
+                        onCheckedChange={setShowInactiveSectores}
+                      />
+                      <Label htmlFor="show-inactive-sectores">Mostrar sectores inactivos</Label>
+                    </div>
+                    
+                    {/* Lista de sectores desde la base de datos */}
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {sectores
+                        .filter((sector: any) => showInactiveSectores || sector.activo)
+                        .map((sector: any) => (
+                        <div key={sector.id} className={`flex items-center justify-between p-4 rounded-lg border ${
+                          sector.activo 
+                            ? 'bg-slate-50 border-slate-200' 
+                            : 'bg-red-50 border-red-200 opacity-75'
+                        }`}>
+                          <div className="flex-1">
                             <div className="flex items-center space-x-2">
+                              <h4 className={`font-semibold ${sector.activo ? 'text-slate-900' : 'text-red-700'}`}>
+                                {sector.nombre}
+                              </h4>
+                              <span className={`px-2 py-1 text-xs rounded-full ${
+                                sector.activo 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {sector.activo ? 'Activo' : 'Inactivo'}
+                              </span>
+                            </div>
+                            {sector.descripcion && (
+                              <p className="text-sm text-slate-500 mt-1">{sector.descripcion}</p>
+                            )}
+                          </div>
+                                                      <div className="flex items-center space-x-2">
                               <Button
                                 onClick={() => {
                                   setEditingSector(sector)
@@ -1058,6 +1250,27 @@ export default function ConfiguracionPage() {
                                 Editar
                               </Button>
                               <Button
+                                onClick={() => sector.activo ? handleDesactivarSector(sector.id) : handleActivarSector(sector.id)}
+                                size="sm"
+                                variant="outline"
+                                className={sector.activo 
+                                  ? "border-yellow-300 text-yellow-600 hover:bg-yellow-50"
+                                  : "border-green-300 text-green-600 hover:bg-green-50"
+                                }
+                              >
+                                {sector.activo ? (
+                                  <>
+                                    <X className="h-4 w-4 mr-1" />
+                                    Desactivar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Activar
+                                  </>
+                                )}
+                              </Button>
+                              <Button
                                 onClick={() => handleEliminarSector(sector.id)}
                                 size="sm"
                                 variant="outline"
@@ -1067,26 +1280,25 @@ export default function ConfiguracionPage() {
                                 Eliminar
                               </Button>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Botón para agregar sector */}
-                      <Button
-                        onClick={() => {
-                          setEditingSector(null)
-                          setSectorForm({ nombre: '', descripcion: '' })
-                          setShowSectorModal(true)
-                        }}
-                        className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Agregar Sector
-                      </Button>
+                        </div>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
+
+                    {/* Botón para agregar sector */}
+                    <Button
+                      onClick={() => {
+                        setEditingSector(null)
+                        setSectorForm({ nombre: '', descripcion: '' })
+                        setShowSectorModal(true)
+                      }}
+                      className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Sector
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Modal para Planes */}

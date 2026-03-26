@@ -36,6 +36,7 @@ import {
   Type
 } from "lucide-react";
 import { apiRequest } from "@/lib/config/api";
+import { useToast } from "@/app/components/shared/Toast";
 
 interface SitioWebData {
   informacion: {
@@ -126,6 +127,7 @@ interface SitioWebData {
 }
 
 export default function SitioWebPage() {
+  const { toast } = useToast()
   const [formData, setFormData] = useState<SitioWebData>({
     informacion: {
       titulo: "",
@@ -207,11 +209,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Información general guardada exitosamente");
+        toast("Información general guardada exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar los datos");
+      toast("Error al guardar los datos", "error");
     } finally {
       setSaving(false);
     }
@@ -228,11 +230,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Servicios guardados exitosamente");
+        toast("Servicios guardados exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar los servicios");
+      toast("Error al guardar los servicios", "error");
     } finally {
       setSaving(false);
     }
@@ -249,11 +251,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Planes guardados exitosamente");
+        toast("Planes guardados exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar los planes");
+      toast("Error al guardar los planes", "error");
     } finally {
       setSaving(false);
     }
@@ -270,11 +272,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Coberturas guardadas exitosamente");
+        toast("Coberturas guardadas exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar las coberturas");
+      toast("Error al guardar las coberturas", "error");
     } finally {
       setSaving(false);
     }
@@ -291,11 +293,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Contactos guardados exitosamente");
+        toast("Contactos guardados exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar los contactos");
+      toast("Error al guardar los contactos", "error");
     } finally {
       setSaving(false);
     }
@@ -312,11 +314,11 @@ export default function SitioWebPage() {
       });
       
       if (response.success) {
-        alert("Carrusel guardado exitosamente");
+        toast("Carrusel guardado exitosamente", "success");
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      alert("Error al guardar el carrusel");
+      toast("Error al guardar el carrusel", "error");
     } finally {
       setSaving(false);
     }

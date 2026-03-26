@@ -45,6 +45,23 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Colores eléctricos para T&Tnet
+        electric: {
+          blue: {
+            DEFAULT: "#00BFFF",
+            light: "#00CCFF",
+            dark: "#0099CC",
+          },
+          green: {
+            DEFAULT: "#00FF00",
+            light: "#32FF32",
+            dark: "#00CC00",
+          },
+        },
+        brand: {
+          yellow: "#FFD700",
+          red: "#FF0000",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -54,6 +71,21 @@ module.exports = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic": "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+      },
+      keyframes: {
+        "gradient": {
+          "0%, 100%": {
+            "background-size": "200% 200%",
+            "background-position": "left center"
+          },
+          "50%": {
+            "background-size": "200% 200%",
+            "background-position": "right center"
+          }
+        }
+      },
+      animation: {
+        "gradient": "gradient 3s ease infinite",
       },
     },
   },

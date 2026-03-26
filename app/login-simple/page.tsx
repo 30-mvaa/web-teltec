@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { loginUser, isAuthenticated, validateAuthentication } from "@/lib/config/api"
+import { loginUser, isAuthenticated, validateAuthentication, API_ENDPOINTS } from "@/lib/config/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -48,7 +48,7 @@ export default function LoginPage() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('userId');
     
-    fetch('http://localhost:8000/api/configuracion/')
+    fetch(API_ENDPOINTS.CONFIGURACION)
       .then(res => res.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {

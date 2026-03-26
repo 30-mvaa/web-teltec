@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
+import * as XLSX from "xlsx"
 import { useRouter } from "next/navigation"
 import {
   Card,
@@ -31,6 +32,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog"
@@ -45,22 +47,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Plus, Edit, Trash2, RefreshCw, Search, User, Mail, Phone, MapPin, X } from "lucide-react"
+import { Pagination } from "@/components/ui/pagination"
+import { ArrowLeft, Plus, Edit, Trash2, RefreshCw, Search, User, Mail, Phone, MapPin, X, Download, Calendar, MessageSquare, Filter, TrendingUp, TrendingDown, Users, AlertCircle, CheckCircle, Upload, FileSpreadsheet, Check, AlertTriangle } from "lucide-react"
 import { validarCedulaEcuatoriana, formatearCedula, validarMayorEdad, calcularEdad, obtenerFechaMinima, obtenerFechaMaxima, formatearFecha } from "@/lib/utils"
 import { Switch } from '@/components/ui/switch'
 import { apiRequest, API_ENDPOINTS } from "@/lib/config/api"
 import { isAuthenticated } from "@/lib/config/api"
+import { useToast } from "@/app/components/shared/Toast"
 
 interface Cliente {
   id: number
   cedula: string
   nombres: string
   apellidos: string
-  tipo_plan: string
-  precio_plan: number
+  tipo_plan_actual?: string
+  precio_plan_actual?: number
   fecha_nacimiento: string
   direccion: string
-  sector: string
+  sector_nombre?: string
   email: string
   telefono: string
   telegram_chat_id?: string
@@ -91,25 +95,42 @@ interface FormData {
 
 export default function ClientesPage() {
   const router = useRouter()
+  const { toast } = useToast()
 
   // Estados principales
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   
   // Estados de búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("")
   const [filterEstado, setFilterEstado] = useState<Cliente["estado"] | "todos">("todos")
+  const [filterSector, setFilterSector] = useState<string>("todos")
   
   // Estados del modal
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Cliente | null>(null)
   
   // Estados de datos
-  const [sectores, setSectores] = useState<string[]>([])
-  const [planes, setPlanes] = useState<{ tipo_plan: string, precio_plan: number }[]>([])
+  const [sectores, setSectores] = useState<{ id: number, nombre_sector: string }[]>([])
+  const [planes, setPlanes] = useState<{ id: number, tipo_plan: string, precio: number }[]>([])
+  
+  // Estados de estadísticas
+  const [estadisticas, setEstadisticas] = useState({
+    total_clientes: 0,
+    clientes_activos: 0,
+    clientes_inactivos: 0,
+    clientes_suspendidos: 0
+  })
+  
+  // Estados de paginación
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   
   // Estados de validación
   const [cedulaError, setCedulaError] = useState<string | null>(null)
@@ -122,6 +143,25 @@ export default function ClientesPage() {
     open: false,
     cliente: null
   })
+
+  // Estados de importación masiva
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResults, setImportResults] = useState<{
+    success: number
+    errors: { row: number; data: any; error: string; columnas?: string[] }[]
+  } | null>(null)
+  const [importSummary, setImportSummary] = useState<{
+    total_procesados: number
+    clientes_creados: number
+    errores: number
+    sectores_creados: number
+    planes_creados: number
+    nuevos_sectores: string[]
+    nuevos_planes: { nombre: string; precio: number }[]
+  } | null>(null)
+  const [previewData, setPreviewData] = useState<string[][]>([])
+  const [importingFile, setImportingFile] = useState<File | null>(null)
   
   // Estado del formulario
   const [formData, setFormData] = useState<FormData>({
@@ -149,54 +189,117 @@ export default function ClientesPage() {
   }
 
   // Cargar datos de clientes
-  async function loadData() {
+  const loadData = useCallback(async (page = 1) => {
     if (!checkAuth()) return
     
+    // Limpiar término de búsqueda de espacios en blanco
+    const searchTermTrimmed = searchTerm.trim()
+    
     // Si hay término de búsqueda, mostrar estado de búsqueda
-    if (searchTerm) {
+    if (searchTermTrimmed) {
       setSearching(true)
+      setLoading(false)
     } else {
       setLoading(true)
+      setSearching(false)
     }
     
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (searchTerm) params.set("search", searchTerm)
-      if (filterEstado !== "todos") params.set("estado", filterEstado)
+      // Solo agregar search si hay un término válido (no vacío)
+      if (searchTermTrimmed) {
+        params.set("search", searchTermTrimmed)
+      }
+      if (filterEstado !== "todos") {
+        params.set("estado", filterEstado)
+      }
+      if (filterSector !== "todos") {
+        params.set("sector", filterSector)
+      }
+      
+      // Parámetros de paginación
+      params.set("page", page.toString())
+      params.set("page_size", pageSize.toString())
       
       const url = `${API_ENDPOINTS.CLIENTES}?${params.toString()}`
       const json = await apiRequest(url)
       
       if (json.success && Array.isArray(json.data)) {
+        console.log('loadData - received clientes:', json.data.length, 'page:', page, 'data:', json.data)
         setClientes(json.data)
+        
+        // Actualizar información de paginación
+        if (json.pagination) {
+          setCurrentPage(json.pagination.page)
+          setTotalPages(json.pagination.total_pages)
+          setTotalCount(json.pagination.total_count)
+        } else {
+          // Si no hay paginación, usar valores por defecto
+          setCurrentPage(1)
+          setTotalPages(1)
+          setTotalCount(json.data.length)
+        }
       } else {
         throw new Error(json.message || "Error cargando clientes")
       }
     } catch (e) {
-      console.error("Error en loadData:", e)
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error en loadData:", e)
+      }
       setError((e as Error).message || "Error cargando clientes")
+      // En caso de error, limpiar los datos
+      setClientes([])
+      setTotalCount(0)
+      setTotalPages(1)
+      setCurrentPage(1)
     } finally {
       setLoading(false)
       setSearching(false)
     }
-  }
+  }, [searchTerm, filterEstado, filterSector, pageSize])
 
-  // Cargar valores únicos (sectores y planes)
-  async function loadValoresUnicos() {
+  // Cargar estadísticas reales del backend
+  const loadEstadisticas = useCallback(async () => {
     if (!checkAuth()) return
     
     try {
-      const data = await apiRequest(API_ENDPOINTS.CLIENTES_VALORES_UNICOS)
+      const data = await apiRequest(API_ENDPOINTS.CLIENTES_ESTADISTICAS)
       
       if (data.success) {
-        setSectores(data.sectores || [])
-        setPlanes(data.planes || [])
+        setEstadisticas(data.data)
       }
     } catch (err) {
-      console.error('Error cargando valores únicos:', err)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error cargando estadísticas:', err)
+      }
     }
-  }
+  }, [])
+
+  // Cargar valores únicos (sectores y planes)
+  const loadValoresUnicos = useCallback(async () => {
+    if (!checkAuth()) return
+    
+    try {
+      // console.log("Cargando valores únicos...")
+      const data = await apiRequest(API_ENDPOINTS.CLIENTES_DATOS_SELECTS)
+      
+      if (data.success) {
+        const sectoresData = data.data.sectores || []
+        const planesData = data.data.planes || []
+        
+        // console.log("Sectores cargados:", sectoresData.length)
+        // console.log("Planes cargados:", planesData.length)
+        
+        setSectores(sectoresData)
+        setPlanes(planesData)
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error cargando valores únicos:', err)
+      }
+    }
+  }, [])
 
   // Validar cédula en tiempo real
   const validarCedulaEnTiempoReal = (cedula: string) => {
@@ -262,7 +365,7 @@ export default function ClientesPage() {
   }
 
   // Abrir modal para nuevo cliente
-  const openNew = () => {
+  const openNew = useCallback(() => {
     setEditing(null)
     setFormData({
       cedula: "",
@@ -283,15 +386,15 @@ export default function ClientesPage() {
     setFechaError(null)
     setEdadCalculada(null)
     setIsDialogOpen(true)
-  }
+  }, [])
 
   // Manejar cambio de plan
-  const handlePlanChange = (tipoPlan: string) => {
-    const planSeleccionado = planes.find(p => p.tipo_plan === tipoPlan)
+  const handlePlanChange = (planId: string) => {
+    const planSeleccionado = planes.find(p => p.id.toString() === planId)
     setFormData(prev => ({
       ...prev,
-      tipo_plan: tipoPlan,
-      precio_plan: planSeleccionado?.precio_plan || 0
+      tipo_plan: planId,
+      precio_plan: planSeleccionado?.precio || 0
     }))
   }
 
@@ -300,29 +403,68 @@ export default function ClientesPage() {
     e.preventDefault()
     if (!checkAuth()) return
 
-    // Validaciones
+    // Log para debug de validaciones
+    // console.log("Validando formulario:", {
+    //   cedulaValida,
+    //   fechaError,
+    //   nombres: formData.nombres.trim(),
+    //   apellidos: formData.apellidos.trim(),
+    //   tipo_plan: formData.tipo_plan,
+    //   sector: formData.sector,
+    //   email: formData.email.trim(),
+    //   telefono: formData.telefono.trim(),
+    //   fecha_nacimiento: formData.fecha_nacimiento,
+    //   direccion: formData.direccion.trim()
+    // })
+
+    // Validaciones del frontend
+    const errores: string[] = []
+    
     if (!cedulaValida) {
-      setError("Por favor, ingrese una cédula válida")
-      return
+      errores.push("Por favor, ingrese una cédula válida")
     }
-
+    
     if (fechaError) {
-      setError("Por favor, ingrese una fecha de nacimiento válida")
-      return
+      errores.push("Por favor, corrija la fecha de nacimiento")
     }
-
-    if (!formData.nombres.trim() || !formData.apellidos.trim()) {
-      setError("Los nombres y apellidos son obligatorios")
-      return
+    
+    if (!formData.nombres.trim()) {
+      errores.push("Los nombres son obligatorios")
     }
-
+    
+    if (!formData.apellidos.trim()) {
+      errores.push("Los apellidos son obligatorios")
+    }
+    
     if (!formData.tipo_plan) {
-      setError("Debe seleccionar un plan")
-      return
+      errores.push("Debe seleccionar un plan")
     }
-
+    
     if (!formData.sector) {
-      setError("Debe seleccionar un sector")
+      errores.push("Debe seleccionar un sector")
+    }
+    
+    if (!formData.email.trim()) {
+      errores.push("El email es obligatorio")
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errores.push("El formato del email es inválido")
+    }
+    
+    if (!formData.telefono.trim()) {
+      errores.push("El teléfono es obligatorio")
+    }
+    
+    if (!formData.fecha_nacimiento) {
+      errores.push("La fecha de nacimiento es obligatoria")
+    }
+    
+    if (!formData.direccion.trim()) {
+      errores.push("La dirección es obligatoria")
+    }
+    
+    // Si hay errores de validación, mostrarlos todos
+    if (errores.length > 0) {
+      toast(`Por favor, corrija los siguientes errores:\n${errores.join('\n')}`, "error")
       return
     }
 
@@ -333,59 +475,166 @@ export default function ClientesPage() {
       
       const method = editing ? 'PUT' : 'POST'
       
+      // Asegurar que la fecha de nacimiento esté presente
+      const fechaNacimiento = formData.fecha_nacimiento
+      
+      // Validar que la fecha esté presente antes de enviar
+      if (!fechaNacimiento) {
+        toast("La fecha de nacimiento es requerida", "error")
+        return
+      }
+      
+      // Preparar datos para el backend normalizado
+      const datosBackend = {
+        cedula: formData.cedula,
+        nombres: formData.nombres,
+        apellidos: formData.apellidos,
+        fecha_nacimiento: fechaNacimiento,
+        direccion: formData.direccion,
+        id_sector: formData.sector ? parseInt(formData.sector) : null,
+        email: formData.email,
+        telefono: formData.telefono,
+        telegram_chat_id: null,
+        estado: formData.estado,
+        plan_id: formData.tipo_plan ? parseInt(formData.tipo_plan) : null
+      }
+      
+      // Log para debug
+      // console.log("Datos del formulario:", formData)
+      // console.log("Datos enviados al backend:", datosBackend)
+      // console.log("URL:", url)
+      // console.log("Método:", method)
+      
       const response = await apiRequest(url, {
         method,
-        body: JSON.stringify(formData)
+        body: JSON.stringify(datosBackend)
       })
 
       if (response.success) {
-        setIsDialogOpen(false)
-        setSuccess(editing ? "Cliente actualizado exitosamente" : "Cliente creado exitosamente")
-        setError(null)
-        loadData()
+        toast(editing ? "Cliente actualizado exitosamente" : "Cliente creado exitosamente", "success")
         
-        // Limpiar mensaje de éxito después de 3 segundos
-        setTimeout(() => setSuccess(null), 3000)
+        // Cerrar modal
+        setIsDialogOpen(false)
+        loadData(1)
+        loadEstadisticas()
       } else {
-        setError(response.message || "Error al guardar cliente")
+        // Mostrar error
+        let errorMessage = "Error al guardar cliente"
+        
+        if (response.message) {
+          errorMessage = response.message
+        } else if (response.error_details) {
+          errorMessage = response.error_details
+        }
+        
+        if (response.errors) {
+          const errorDetails = Object.entries(response.errors)
+            .map(([field, messages]) => {
+              const fieldNames: { [key: string]: string } = {
+                'cedula': 'Cédula',
+                'nombres': 'Nombres',
+                'apellidos': 'Apellidos',
+                'fecha_nacimiento': 'Fecha de nacimiento',
+                'direccion': 'Dirección',
+                'email': 'Email',
+                'telefono': 'Teléfono',
+                'id_sector': 'Sector',
+                'plan_id': 'Plan'
+              }
+              
+              const fieldName = fieldNames[field] || field
+              const message = Array.isArray(messages) ? messages.join(', ') : messages
+              
+              return `${fieldName}: ${message}`
+            })
+            .join('\n')
+          errorMessage = `Errores de validación:\n${errorDetails}`
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.error("Error completo del backend:", response)
+        }
+        
+        toast(errorMessage, "error")
       }
     } catch (e) {
-      console.error("Error en handleSubmit:", e)
-      setError((e as Error).message || "Error al guardar cliente")
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error en handleSubmit:", e)
+      }
+      
+      let errorMessage = "Error al guardar cliente"
+      
+      if (e instanceof Error) {
+        errorMessage = e.message
+      } else if (typeof e === 'object' && e !== null && 'message' in e) {
+        errorMessage = String((e as any).message)
+      }
+      
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+        errorMessage = "Error de conexión con el servidor."
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        errorMessage = "Tiempo de espera agotado."
+      }
+      
+      toast(errorMessage, "error")
     }
   }
 
   // Abrir modal de edición
-  const handleEdit = (c: Cliente) => {
+  const handleEdit = useCallback((c: Cliente) => {
+    console.log("handleEdit - Cliente recibido:", c)
+    console.log("handleEdit - fecha_nacimiento:", c.fecha_nacimiento)
+    console.log("handleEdit - direccion:", c.direccion)
     setEditing(c)
-    setFormData({
+    
+    // Necesitamos obtener el ID del sector y plan, no solo el nombre
+    // Para esto, vamos a buscar en los arrays de sectores y planes
+    const sectorId = sectores.find(s => s.nombre_sector === c.sector_nombre)?.id?.toString() || ""
+    const planId = planes.find(p => p.tipo_plan === c.tipo_plan_actual)?.id?.toString() || ""
+    
+    // console.log("Sector encontrado:", { nombre: c.sector_nombre, id: sectorId })
+    // console.log("Plan encontrado:", { tipo: c.tipo_plan_actual, id: planId })
+    
+    const formDataToSet = {
       cedula: c.cedula,
       nombres: c.nombres,
       apellidos: c.apellidos,
-      tipo_plan: c.tipo_plan,
-      precio_plan: c.precio_plan,
+      tipo_plan: planId,
+      precio_plan: c.precio_plan_actual || 0,
       fecha_nacimiento: c.fecha_nacimiento,
       direccion: c.direccion,
-      sector: c.sector,
+      sector: sectorId,
       email: c.email,
       telefono: c.telefono,
       telegram_chat_id: c.telegram_chat_id || "",
       estado: c.estado,
-    })
+    }
+    
+    console.log("handleEdit - formDataToSet:", formDataToSet)
+    console.log("handleEdit - fecha_nacimiento en formDataToSet:", formDataToSet.fecha_nacimiento)
+    console.log("handleEdit - direccion en formDataToSet:", formDataToSet.direccion)
+    
+    setFormData(formDataToSet)
     setCedulaError(null)
     setCedulaValida(true)
     setFechaError(null)
     setEdadCalculada(calcularEdad(c.fecha_nacimiento))
+    
+    // Validar la fecha de nacimiento después de establecer el formData usando requestAnimationFrame
+    requestAnimationFrame(() => {
+      validarFechaNacimientoEnTiempoReal(c.fecha_nacimiento)
+    })
+    
     setIsDialogOpen(true)
-  }
+  }, [sectores, planes])
 
   // Abrir diálogo de confirmación de eliminación
-  const handleDeleteClick = (cliente: Cliente) => {
+  const handleDeleteClick = useCallback((cliente: Cliente) => {
     setDeleteDialog({ open: true, cliente })
-  }
+  }, [])
 
   // Confirmar eliminación
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = useCallback(async () => {
     if (!deleteDialog.cliente) return
     
     try {
@@ -394,29 +643,450 @@ export default function ClientesPage() {
       })
 
       if (response.success) {
-        setSuccess("Cliente eliminado exitosamente")
-        setError(null)
-        loadData()
+        toast("Cliente eliminado exitosamente", "success")
         
-        // Limpiar mensaje de éxito después de 3 segundos
-        setTimeout(() => setSuccess(null), 3000)
+        // Recargar datos manteniendo los filtros actuales y la página
+        const currentPageAfterDelete = clientes.length === 1 && currentPage > 1 
+          ? currentPage - 1 
+          : currentPage
+        
+        setCurrentPage(currentPageAfterDelete)
+        loadData(currentPageAfterDelete)
+        loadEstadisticas()
       } else {
-        setError(response.message || "Error al eliminar cliente")
+        toast(response.message || "Error al eliminar cliente", "error")
       }
     } catch (e) {
-      console.error("Error en handleDelete:", e)
-      setError((e as Error).message || "Error al eliminar cliente")
+      if (process.env.NODE_ENV === 'development') {
+        console.error("Error en handleDelete:", e)
+      }
+      toast((e as Error).message || "Error al eliminar cliente", "error")
     } finally {
       setDeleteDialog({ open: false, cliente: null })
     }
+  }, [deleteDialog.cliente, clientes.length, currentPage, loadData, loadEstadisticas, toast])
+
+  // Función auxiliar para parsear CSV
+  const parseCSV = (text: string) => {
+    const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    const lines = normalizedText.split('\n').filter(line => line.trim())
+    console.log('CSV lines:', lines.length, 'First line:', lines[0]?.substring(0, 50))
+    if (lines.length < 2) return null
+    
+    const rows = lines.map(line => {
+      const cells: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (const char of line) {
+        if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          cells.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      cells.push(current.trim())
+      return cells
+    })
+    
+    console.log('CSV parsed, rows:', rows.length, 'cols:', rows[0]?.length)
+    return { rows, separator: ',' }
   }
 
-  // Calcular estadísticas
-  const getStats = () => {
-    const total = clientes.length
-    const activos = clientes.filter(c => c.estado === 'activo').length
-    const suspendidos = clientes.filter(c => c.estado === 'suspendido').length
-    const inactivos = clientes.filter(c => c.estado === 'inactivo').length
+  const parseExcel = (arrayBuffer: ArrayBuffer): { rows: string[][]; separator: string } | null => {
+    try {
+      console.log('Parsing Excel, buffer size:', arrayBuffer.byteLength, 'XLSX available:', typeof XLSX)
+      if (!XLSX || !XLSX.read) {
+        console.error('XLSX not loaded')
+        return null
+      }
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
+      console.log('Workbook sheets:', workbook.SheetNames)
+      if (workbook.SheetNames.length === 0) {
+        console.error('No sheets in workbook')
+        return null
+      }
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][]
+      console.log('Excel rows:', jsonData?.length)
+      
+      if (!jsonData || jsonData.length < 2) return null
+      
+      const rows = jsonData.map(row => {
+        const arr = row as any[]
+        return arr.map(cell => {
+          if (cell === null || cell === undefined) return ''
+          if (typeof cell === 'object' && cell instanceof Date) {
+            return cell.toISOString().split('T')[0]
+          }
+          return String(cell)
+        })
+      })
+      console.log('Parsed rows:', rows.length, 'Headers:', rows[0])
+      return { rows, separator: 'excel' }
+    } catch (error) {
+      console.error('Error parsing Excel:', error)
+      return null
+    }
+  }
+
+  const isExcelFile = (filename: string): boolean => {
+    return filename.toLowerCase().endsWith('.xlsx') || filename.toLowerCase().endsWith('.xls')
+  }
+
+  // Manejar carga de archivo CSV/Excel
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const isExcel = isExcelFile(file.name)
+    
+    if (!file.name.endsWith('.csv') && !isExcel) {
+      toast("Solo se permiten archivos CSV o Excel (.xlsx)", "error")
+      setImportingFile(null)
+      setPreviewData([])
+      return
+    }
+
+    setImportingFile(file)
+    setImportResults(null)
+    setImportSummary(null)
+    setPreviewData([])
+
+    if (isExcel) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        console.log('Excel file read complete, result type:', typeof event.target?.result)
+        const arrayBuffer = event.target?.result as ArrayBuffer
+        if (!arrayBuffer) {
+          toast("No se pudo leer el archivo", "error")
+          return
+        }
+        
+        console.log('Buffer size:', arrayBuffer.byteLength)
+        const parsed = parseExcel(arrayBuffer)
+        if (!parsed) {
+          toast("El archivo está vacío o no tiene datos", "error")
+          setImportingFile(null)
+          return
+        }
+
+        const { rows } = parsed
+        
+        const headers = rows[0].map(h => String(h).toLowerCase().replace(/[_\s]/g, ''))
+        const requiredHeaders = ['cedula', 'nombres', 'apellidos', 'email', 'telefono']
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+        
+        if (missingHeaders.length > 0) {
+          toast(`Faltan columnas: ${missingHeaders.join(', ')}`, "error")
+          setPreviewData([])
+          return
+        }
+
+        setPreviewData(rows.slice(0, 6))
+        toast(`${rows.length - 1} registros (Excel)`, "success")
+      }
+      reader.onerror = (e) => {
+        console.error('FileReader error:', e)
+        toast("Error al leer el archivo: " + (e.target as any)?.error?.message || "Error desconocido", "error")
+        setImportingFile(null)
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const text = event.target?.result as string
+        if (!text) {
+          toast("No se pudo leer el archivo", "error")
+          return
+        }
+        
+        const parsed = parseCSV(text)
+        if (!parsed) {
+          toast("El archivo está vacío o no tiene datos", "error")
+          setImportingFile(null)
+          return
+        }
+
+        const { rows, separator } = parsed
+
+        const headers = rows[0].map(h => h.toLowerCase().replace(/[_\s]/g, ''))
+        const requiredHeaders = ['cedula', 'nombres', 'apellidos', 'email', 'telefono']
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+        
+        console.log('Preview - Separator:', separator, 'Headers:', headers)
+        
+        if (missingHeaders.length > 0) {
+          toast(`Faltan columnas: ${missingHeaders.join(', ')}. Separador: ${separator}`, "error")
+          setPreviewData([])
+          return
+        }
+
+        setPreviewData(rows.slice(0, 6))
+        toast(`${rows.length - 1} regs - Separador: ${separator === ';' ? ';' : ','}`, "success")
+      }
+      reader.onerror = () => {
+        toast("Error al leer el archivo", "error")
+        setImportingFile(null)
+      }
+      reader.readAsText(file)
+    }
+  }, [toast])
+
+  // Descargar plantilla
+  const handleDownloadTemplate = useCallback(() => {
+    const headers = ['cedula', 'nombres', 'apellidos', 'email', 'telefono', 'direccion', 'sector', 'plan', 'precio', 'fechanacimiento', 'estado']
+    const exampleRows = [
+      ['1234567890', 'Juan', 'Pérez', 'juan@email.com', '0987654321', 'Av. Principal 123', 'Centro', 'Básico', '25.00', '1990-01-15', 'activo'],
+      ['1712345678', 'María', 'García', 'maria@email.com', '0991234567', 'Calle 2 #3-45', 'Norte', 'Premium', '45.00', '1985-06-20', 'activo'],
+    ]
+    
+    const sectoresDisponibles = sectores.map(s => s.nombre_sector).join(', ')
+    const planesDisponibles = planes.map(p => `${p.tipo_plan} ($${p.precio})`).join(', ')
+    
+    const csvContent = [
+      headers.join(','),
+      ...exampleRows.map(row => row.join(',')),
+      '',
+      `# Columnas requeridas: cedula, nombres, apellidos, email, telefono`,
+      `# Columnas opcionales: direccion, sector, plan, precio, fechanacimiento, estado`,
+      `# Sector y Plan se crean automaticamente si no existen`,
+      `# Sectores disponibles: ${sectoresDisponibles || 'Ninguno'}`,  
+      `# Planes disponibles: ${planesDisponibles || 'Ninguno'}`
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'plantilla_clientes.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, [sectores, planes])
+
+  // Ejecutar importación
+  const handleExecuteImport = useCallback(async () => {
+    if (!importingFile) {
+      toast("Seleccione un archivo primero", "error")
+      return
+    }
+
+    setImporting(true)
+    setImportResults(null)
+    setImportSummary(null)
+
+    try {
+      const isExcel = isExcelFile(importingFile.name)
+      let rows: string[][]
+      
+      if (isExcel) {
+        const arrayBuffer = await importingFile.arrayBuffer()
+        const parsed = parseExcel(arrayBuffer)
+        if (!parsed) {
+          toast("El archivo está vacío o no tiene datos", "error")
+          setImporting(false)
+          return
+        }
+        rows = parsed.rows
+      } else {
+        const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = () => reject(new Error("Error reading file"))
+        reader.readAsText(importingFile)
+      })
+        const parsed = parseCSV(text)
+        if (!parsed) {
+          toast("El archivo está vacío o no tiene datos", "error")
+          setImporting(false)
+          return
+        }
+        rows = parsed.rows
+      }
+      
+      console.log('Rows count:', rows.length, 'Headers:', rows[0])
+      const headers = rows[0].map(h => String(h).toLowerCase().replace(/[_\s]/g, ''))
+      const dataRows = rows.slice(1)
+
+      const requiredHeaders = ['cedula', 'nombres', 'apellidos', 'email', 'telefono']
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+      
+      if (missingHeaders.length > 0) {
+        const mensajeError = `Columnas faltantes: ${missingHeaders.join(', ')}. Verifica que el archivo tenga el formato correcto.`
+        setImportResults({ 
+          success: 0, 
+          errors: [{ 
+            row: 1, 
+            data: rows[0], 
+            error: mensajeError,
+            columnas: missingHeaders
+          }] 
+        })
+        setImporting(false)
+        return
+      }
+
+      const getColumnIndex = (name: string) => {
+        const idx = headers.indexOf(name)
+        if (idx === -1) {
+          const variations = [name, name.replace('_', ''), name.replace(' ', '')]
+          for (const v of variations) {
+            const found = headers.findIndex(h => h.includes(v) || v.includes(h))
+            if (found !== -1) return found
+          }
+        }
+        return idx
+      }
+      const getValue = (row: string[], name: string) => {
+        const idx = getColumnIndex(name)
+        return idx >= 0 && idx < row.length ? row[idx] || '' : ''
+      }
+
+      const clientesData: any[] = []
+      const errors: { row: number; data: any; error: string; columnas?: string[] }[] = []
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i]
+        const rowNumber = i + 2
+
+        const cedula = getValue(row, 'cedula')
+        const email = getValue(row, 'email')
+        const nombres = getValue(row, 'nombres')
+        const apellidos = getValue(row, 'apellidos')
+        const telefono = getValue(row, 'telefono')
+        
+        const missingFields: string[] = []
+        
+        if (!cedula.trim()) missingFields.push('cédula')
+        if (!email.trim()) missingFields.push('email')
+        if (!nombres.trim()) missingFields.push('nombres')
+        if (!apellidos.trim()) missingFields.push('apellidos')
+        if (!telefono.trim()) missingFields.push('teléfono')
+
+        if (missingFields.length > 0) {
+          errors.push({
+            row: rowNumber,
+            data: row,
+            error: `Campos faltantes: ${missingFields.join(', ')}`,
+            columnas: missingFields
+          })
+          continue
+        }
+
+        if (!validarCedulaEcuatoriana(cedula)) {
+          errors.push({
+            row: rowNumber,
+            data: row,
+            error: `Cédula inválida: "${cedula}" (debe tener 10 dígitos y ser ecuatoriana válida)`,
+            columnas: ['cédula']
+          })
+          continue
+        }
+
+        if (!email.includes('@') || !email.includes('.')) {
+          errors.push({
+            row: rowNumber,
+            data: row,
+            error: `Email inválido: "${email}"`,
+            columnas: ['email']
+          })
+          continue
+        }
+
+        const sectorNombre = getValue(row, 'sector').trim()
+        const planTipo = getValue(row, 'plan').trim()
+        const planPrecio = getValue(row, 'precio').trim()
+        const fechanacimiento = getValue(row, 'fechanacimiento').trim()
+        
+        clientesData.push({
+          cedula,
+          nombres: nombres.trim(),
+          apellidos: apellidos.trim(),
+          email: email.trim().toLowerCase(),
+          telefono: telefono.replace(/\D/g, ''),
+          direccion: getValue(row, 'direccion').trim() || 'Sin dirección',
+          sector: sectorNombre,
+          plan: planTipo,
+          precio: planPrecio || '25.00',
+          fecha_nacimiento: fechanacimiento || '1990-01-01',
+          estado: getValue(row, 'estado').trim().toLowerCase() || 'activo',
+        })
+      }
+
+      if (clientesData.length === 0) {
+        setImportResults({ success: 0, errors })
+        setImporting(false)
+        return
+      }
+
+      const response = await apiRequest(API_ENDPOINTS.CLIENTES_BULK_IMPORT, {
+        method: 'POST',
+        body: JSON.stringify({ clientes: clientesData }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.success || response.created?.length > 0) {
+        const successCount = response.resumen?.clientes_creados || response.created?.length || clientesData.length - errors.length
+        setImportResults({
+          success: successCount,
+          errors: [...errors, ...(response.errors || [])]
+        })
+        setImportSummary(response.resumen || {
+          total_procesados: clientesData.length,
+          clientes_creados: successCount,
+          errores: errors.length + (response.errors?.length || 0),
+          sectores_creados: 0,
+          planes_creados: 0,
+          nuevos_sectores: [],
+          nuevos_planes: []
+        })
+        toast(`Se importaron ${successCount} clientes exitosamente`, "success")
+        
+        if (errors.length > 0 || response.errors?.length > 0) {
+          toast(`${errors.length + (response.errors?.length || 0)} registros tuvieron errores`, "error")
+        }
+
+        loadData(1)
+        loadEstadisticas()
+        loadValoresUnicos()
+      } else {
+        toast(response.message || "Error al importar clientes", "error")
+        if (response.errors) {
+          setImportResults({
+            success: 0,
+            errors: response.errors
+          })
+        }
+      }
+    } catch (e) {
+      toast((e as Error).message || "Error al procesar el archivo", "error")
+    } finally {
+      setImporting(false)
+    }
+  }, [importingFile, sectores, planes, loadData, loadEstadisticas, toast])
+
+  // Cerrar modal de importación y limpiar estados
+  const handleCloseImportModal = useCallback(() => {
+    setImportModalOpen(false)
+    setImportingFile(null)
+    setPreviewData([])
+    setImportResults(null)
+    setImportSummary(null)
+  }, [])
+
+  // Calcular estadísticas usando datos reales del backend
+  const getStats = useMemo(() => {
+    const total = estadisticas.total_clientes
+    const activos = estadisticas.clientes_activos
+    const suspendidos = estadisticas.clientes_suspendidos
+    const inactivos = estadisticas.clientes_inactivos
 
     return {
       total,
@@ -427,34 +1097,215 @@ export default function ClientesPage() {
       porcentajeSuspendidos: total > 0 ? Math.round((suspendidos / total) * 100) : 0,
       porcentajeInactivos: total > 0 ? Math.round((inactivos / total) * 100) : 0
     }
-  }
+  }, [estadisticas])
 
   // Refrescar datos
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true)
     setSearchTerm("")
     setFilterEstado("todos")
-    loadData()
+    setFilterSector("todos")
+    setCurrentPage(1)
+    loadData(1)
     loadValoresUnicos()
+    loadEstadisticas()
+    setTimeout(() => {
+      setRefreshing(false)
+      toast("Datos actualizados correctamente", "success")
+    }, 500)
+  }, [loadData, loadValoresUnicos, loadEstadisticas, toast])
+
+  // Limpiar filtros
+  const handleLimpiarFiltros = useCallback(() => {
+    setSearchTerm("")
+    setFilterEstado("todos")
+    setFilterSector("todos")
+    setCurrentPage(1)
+    loadData(1)
+  }, [loadData])
+
+  // Contactar por WhatsApp
+  const handleContactarWhatsApp = (cliente: Cliente) => {
+    if (!cliente.telefono) {
+      toast("El cliente no tiene número de teléfono registrado", "error")
+      return
+    }
+    const telefonoLimpio = cliente.telefono.replace(/\D/g, '')
+    const mensaje = `Hola ${cliente.nombres}, desde TelTec nos comunicamos con usted.`
+    window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, '_blank')
   }
 
-  // Cargar datos al montar el componente
+  // Contactar por Email
+  const handleContactarEmail = (cliente: Cliente) => {
+    if (!cliente.email) {
+      toast("El cliente no tiene email registrado", "error")
+      return
+    }
+    const asunto = "Comunicación desde TelTec"
+    const mensaje = `Estimado/a ${cliente.nombres} ${cliente.apellidos},\n\n`
+    window.location.href = `mailto:${cliente.email}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(mensaje)}`
+  }
+
+  // Función para exportar clientes a CSV
+  const handleExport = useCallback(async () => {
+    try {
+      // Obtener todos los clientes del backend sin paginación
+      // Aplicar los mismos filtros que el usuario tiene seleccionados
+      const params = new URLSearchParams()
+      if (searchTerm) params.set("search", searchTerm)
+      if (filterEstado !== "todos") params.set("estado", filterEstado)
+      
+      // Solicitar todos los clientes sin paginación (usar un page_size muy grande)
+      params.set("page", "1")
+      params.set("page_size", "10000") // Número grande para obtener todos
+      
+      const apiUrl = `${API_ENDPOINTS.CLIENTES}?${params.toString()}`
+      const json = await apiRequest(apiUrl)
+      
+      if (!json.success || !Array.isArray(json.data)) {
+        toast('Error al obtener los clientes para exportar', 'error');
+        return;
+      }
+
+      const todosLosClientes = json.data;
+
+      if (todosLosClientes.length === 0) {
+        toast('No hay clientes para exportar', 'error');
+        return;
+      }
+
+      // Preparar datos para CSV
+      const headers = [
+        'ID',
+        'Cédula',
+        'Nombres',
+        'Apellidos',
+        'Plan',
+        'Precio Plan',
+        'Fecha de Nacimiento',
+        'Dirección',
+        'Sector',
+        'Email',
+        'Teléfono',
+        'Estado',
+        'Fecha Registro',
+        'Fecha Actualización',
+        'Último Pago',
+        'Meses Pendientes',
+        'Monto Total Deuda',
+        'Fecha Vencimiento',
+        'Estado Pago'
+      ];
+
+      const rows = todosLosClientes.map((cliente: Cliente) => {
+        const fechaNacimiento = cliente.fecha_nacimiento ? new Date(cliente.fecha_nacimiento).toLocaleDateString('es-ES') : 'N/A';
+        const fechaRegistro = formatearFecha(cliente.fecha_registro);
+        const fechaActualizacion = formatearFecha(cliente.fecha_actualizacion);
+        const ultimoPago = cliente.fecha_ultimo_pago ? formatearFecha(cliente.fecha_ultimo_pago) : 'N/A';
+        const fechaVencimiento = cliente.fecha_vencimiento_pago ? formatearFecha(cliente.fecha_vencimiento_pago) : 'N/A';
+        
+        return [
+          cliente.id.toString(),
+          cliente.cedula || '',
+          cliente.nombres || '',
+          cliente.apellidos || '',
+          cliente.tipo_plan_actual || 'Sin plan',
+          cliente.precio_plan_actual ? `$${cliente.precio_plan_actual.toFixed(2)}` : '$0.00',
+          fechaNacimiento,
+          cliente.direccion || '',
+          cliente.sector_nombre || 'Sin sector',
+          cliente.email || '',
+          cliente.telefono || '',
+          cliente.estado || '',
+          fechaRegistro,
+          fechaActualizacion,
+          ultimoPago,
+          cliente.meses_pendientes?.toString() || '0',
+          cliente.monto_total_deuda ? `$${cliente.monto_total_deuda.toFixed(2)}` : '$0.00',
+          fechaVencimiento,
+          cliente.estado_pago || 'N/A'
+        ];
+      });
+
+      // Crear contenido CSV
+      const csvContent = [
+        headers.join(','),
+        ...rows.map((row: string[]) => row.map((cell: string) => `"${cell}"`).join(','))
+      ].join('\n');
+
+      // Crear y descargar archivo
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const downloadUrl = URL.createObjectURL(blob);
+      link.setAttribute('href', downloadUrl);
+      link.setAttribute('download', `clientes_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+      
+      // Usar requestAnimationFrame para evitar bloqueo del hilo principal
+      requestAnimationFrame(() => {
+        toast(`Se exportaron ${todosLosClientes.length} clientes exitosamente.`, 'success');
+      })
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error al exportar clientes:', error);
+      }
+      requestAnimationFrame(() => {
+        toast('Error al exportar los clientes. Por favor, intenta de nuevo.', 'error');
+      })
+    }
+  }, [searchTerm, filterEstado])
+  
+  // Cambiar página
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page)
+    requestAnimationFrame(() => {
+      loadData(page)
+    })
+  }, [loadData])
+  
+  // Cambiar tamaño de página
+  const handlePageSizeChange = useCallback((newPageSize: number) => {
+    setPageSize(newPageSize)
+    setCurrentPage(1)
+    requestAnimationFrame(() => {
+      loadData(1)
+    })
+  }, [loadData])
+
+  // Cargar datos iniciales
   useEffect(() => {
     if (checkAuth()) {
-      loadData()
+      loadData(1)
+      loadEstadisticas()
       loadValoresUnicos()
     }
-  }, [])
+  }, [loadData, loadEstadisticas, loadValoresUnicos])
 
   // Búsqueda con debounce
   useEffect(() => {
+    // Si el término de búsqueda está vacío, recargar inmediatamente
+    if (searchTerm.trim() === "") {
+      if (checkAuth()) {
+        setCurrentPage(1)
+        loadData(1)
+      }
+      return
+    }
+    
+    // Si hay término de búsqueda, esperar 300ms después de que el usuario deje de escribir
     const timeoutId = setTimeout(() => {
       if (checkAuth()) {
-        loadData()
+        setCurrentPage(1)
+        loadData(1)
       }
-    }, 300) // Esperar 300ms después de que el usuario deje de escribir
+    }, 300)
 
     return () => clearTimeout(timeoutId)
-  }, [searchTerm, filterEstado])
+  }, [searchTerm, filterEstado, loadData])
 
   if (loading) return <div className="p-6 text-center">Cargando clientes...</div>
 
@@ -477,145 +1328,85 @@ export default function ClientesPage() {
               <p className="text-gray-600">Administra los clientes del sistema</p>
             </div>
           </div>
-          <Button onClick={openNew} className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Cliente
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setImportModalOpen(true)} variant="outline" className="flex items-center space-x-2">
+              <Upload className="h-4 w-4" />
+              Importar
+            </Button>
+            <Button onClick={openNew} className="flex items-center space-x-2 bg-green-600 hover:bg-green-700">
+              <Plus className="h-4 w-4" />
+              Nuevo Cliente
+            </Button>
+          </div>
         </div>
 
-        {/* Mensajes de error y éxito */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800">{error}</p>
-          </div>
-        )}
-        
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-800">{success}</p>
-          </div>
-        )}
-
         {/* Estadísticas */}
-        <div className="flex justify-center mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-6xl">
-            {(() => {
-              const stats = getStats()
-              return (
-                <>
-                  <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:shadow-lg transition-shadow transform hover:scale-105">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-blue-100 text-sm font-medium">Total Clientes</p>
-                          <p className="text-3xl font-bold">{stats.total}</p>
-                          <p className="text-blue-200 text-xs mt-1">
-                            {stats.total > 0 ? 'Todos los registros' : 'Sin clientes'}
-                          </p>
-                        </div>
-                        <div className="w-12 h-12 bg-blue-400 bg-opacity-30 rounded-full flex items-center justify-center">
-                          <User className="h-6 w-6" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+        <div className="flex flex-wrap gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg flex-1 min-w-[180px]">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-xs font-medium">Total Clientes</p>
+                <p className="text-2xl font-bold">{getStats.total}</p>
+                <p className="text-blue-200 text-xs">{getStats.total > 0 ? 'Registros' : 'Sin clientes'}</p>
+              </div>
+              <div className="p-2 bg-blue-400/20 rounded-full">
+                <Users className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
 
-                  <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white hover:shadow-lg transition-shadow transform hover:scale-105">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-green-100 text-sm font-medium">Activos</p>
-                          <p className="text-3xl font-bold">{stats.activos}</p>
-                          <p className="text-green-200 text-xs mt-1">
-                            {stats.porcentajeActivos}% del total
-                          </p>
-                        </div>
-                        <div className="w-12 h-12 bg-green-400 bg-opacity-30 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg flex-1 min-w-[180px]">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-xs font-medium">Activos</p>
+                <p className="text-2xl font-bold">{getStats.activos}</p>
+                <p className="text-green-200 text-xs">{getStats.porcentajeActivos}% del total</p>
+              </div>
+              <div className="p-2 bg-green-400/20 rounded-full">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
 
-                  <Card className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white hover:shadow-lg transition-shadow transform hover:scale-105">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-yellow-100 text-sm font-medium">Suspendidos</p>
-                          <p className="text-3xl font-bold">{stats.suspendidos}</p>
-                          <p className="text-yellow-200 text-xs mt-1">
-                            {stats.porcentajeSuspendidos}% del total
-                          </p>
-                        </div>
-                        <div className="w-12 h-12 bg-yellow-400 bg-opacity-30 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-0 shadow-lg flex-1 min-w-[180px]">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-yellow-100 text-xs font-medium">Suspendidos</p>
+                <p className="text-2xl font-bold">{getStats.suspendidos}</p>
+                <p className="text-yellow-200 text-xs">{getStats.porcentajeSuspendidos}% del total</p>
+              </div>
+              <div className="p-2 bg-yellow-400/20 rounded-full">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
 
-                  <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white hover:shadow-lg transition-shadow transform hover:scale-105">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-red-100 text-sm font-medium">Inactivos</p>
-                          <p className="text-3xl font-bold">{stats.inactivos}</p>
-                          <p className="text-red-200 text-xs mt-1">
-                            {stats.porcentajeInactivos}% del total
-                          </p>
-                        </div>
-                        <div className="w-12 h-12 bg-red-400 bg-opacity-30 rounded-full flex items-center justify-center">
-                          <div className="w-3 h-3 bg-white rounded-full"></div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              )
-            })()}
-          </div>
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg flex-1 min-w-[180px]">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-red-100 text-xs font-medium">Inactivos</p>
+                <p className="text-2xl font-bold">{getStats.inactivos}</p>
+                <p className="text-red-200 text-xs">{getStats.porcentajeInactivos}% del total</p>
+              </div>
+              <div className="p-2 bg-red-400/20 rounded-full">
+                <TrendingDown className="w-6 h-6" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filtros y búsqueda */}
         <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <Label htmlFor="search">Buscar</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="search"
-                    placeholder="Buscar por nombre, cédula, email..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        loadData()
-                      }
-                    }}
-                    className={`pl-10 ${searching ? 'pr-10' : ''}`}
-                    disabled={searching}
-                  />
-                  {searching && (
-                    <div className="absolute right-3 top-3">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    </div>
-                  )}
-                  {searchTerm && !searching && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchTerm("")}
-                      className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="w-full md:w-48">
-                <Label htmlFor="estado">Estado</Label>
-                <Select value={filterEstado} onValueChange={(value: any) => setFilterEstado(value)}>
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row flex-wrap gap-4 items-end">
+              {/* Estado */}
+              <div className="w-full md:w-40">
+                <Label className="text-xs font-medium text-gray-500">Estado</Label>
+                <Select value={filterEstado} onValueChange={(value: any) => {
+                  setFilterEstado(value)
+                  setCurrentPage(1)
+                  loadData(1)
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -627,13 +1418,115 @@ export default function ClientesPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-end">
-                <Button onClick={handleRefresh} variant="outline" className="flex items-center space-x-2">
-                  <RefreshCw className="h-4 w-4" />
-                  Refrescar
+
+              {/* Sector */}
+              <div className="w-full md:w-48">
+                <Label className="text-xs font-medium text-gray-500">Sector</Label>
+                <Select value={filterSector} onValueChange={(value) => {
+                  setFilterSector(value)
+                  setCurrentPage(1)
+                  loadData(1)
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos los sectores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los sectores</SelectItem>
+                    {sectores.map((sector) => (
+                      <SelectItem key={sector.id} value={sector.id.toString()}>
+                        {sector.nombre_sector}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Buscar */}
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-xs font-medium text-gray-500">Buscar</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Nombre, cédula, email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setCurrentPage(1)
+                        loadData(1)
+                      }
+                    }}
+                    className="pl-10"
+                    disabled={searching}
+                  />
+                  {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+                  {searchTerm && !searching && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm("")
+                        setCurrentPage(1)
+                        loadData(1)
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} variant="outline" disabled={refreshing} className="gap-1">
+                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Actualizando...' : 'Actualizar'}
+                </Button>
+                <Button onClick={handleLimpiarFiltros} variant="outline" className="gap-1">
+                  <Filter className="h-4 w-4" />
+                  Limpiar
+                </Button>
+                <Button onClick={handleExport} variant="outline" className="gap-1">
+                  <Download className="h-4 w-4" />
+                  Exportar
                 </Button>
               </div>
             </div>
+
+            {/* Filtros activos */}
+            {(filterEstado !== 'todos' || filterSector !== 'todos' || searchTerm) && (
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-gray-500">Filtros activos:</span>
+                {filterEstado !== 'todos' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Estado: {filterEstado}
+                    <button onClick={() => { setFilterEstado('todos'); loadData(1) }} className="ml-1 hover:text-red-600">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                {filterSector !== 'todos' && (
+                  <Badge variant="secondary" className="text-xs">
+                    Sector: {sectores.find(s => s.id.toString() === filterSector)?.nombre_sector || filterSector}
+                    <button onClick={() => { setFilterSector('todos'); loadData(1) }} className="ml-1 hover:text-red-600">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+                {searchTerm && (
+                  <Badge variant="secondary" className="text-xs">
+                    Búsqueda: "{searchTerm}"
+                    <button onClick={() => { setSearchTerm(""); loadData(1) }} className="ml-1 hover:text-red-600">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -641,10 +1534,15 @@ export default function ClientesPage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Clientes ({clientes.length})
+              Clientes ({totalCount > 0 ? totalCount : clientes.length})
               {searchTerm && (
                 <span className="text-sm font-normal text-gray-500 ml-2">
                   - Resultados para "{searchTerm}"
+                </span>
+              )}
+              {filterEstado !== "todos" && (
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  - Filtrado por estado: {filterEstado}
                 </span>
               )}
             </CardTitle>
@@ -686,26 +1584,49 @@ export default function ClientesPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{cliente.tipo_plan}</p>
-                          <p className="text-sm text-gray-500">${cliente.precio_plan}</p>
+                          <p className="font-medium">{cliente.tipo_plan_actual || 'Sin plan'}</p>
+                          <p className="text-sm text-gray-500">
+                            {cliente.precio_plan_actual ? `$${cliente.precio_plan_actual}` : 'Sin precio'}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
                             <Mail className="h-3 w-3 text-gray-400" />
-                            <span className="text-sm">{cliente.email}</span>
+                            <span className="text-sm">{cliente.email || '-'}</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Phone className="h-3 w-3 text-gray-400" />
-                            <span className="text-sm">{cliente.telefono}</span>
+                            <span className="text-sm">{cliente.telefono || '-'}</span>
+                          </div>
+                          {/* Botones de contacto rápido */}
+                          <div className="flex gap-1 mt-1">
+                            {cliente.telefono && (
+                              <button
+                                onClick={() => handleContactarWhatsApp(cliente)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="Contactar por WhatsApp"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                            )}
+                            {cliente.email && (
+                              <button
+                                onClick={() => handleContactarEmail(cliente)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Contactar por Email"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <MapPin className="h-3 w-3 text-gray-400" />
-                          <span className="text-sm">{cliente.sector}</span>
+                          <span className="text-sm">{cliente.sector_nombre || 'Sin sector'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -741,6 +1662,19 @@ export default function ClientesPage() {
                 </TableBody>
               </Table>
             </div>
+            
+            {/* Controles de paginación */}
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+                showPageSizeSelector={true}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -752,6 +1686,9 @@ export default function ClientesPage() {
             <DialogTitle>
               {editing ? "Editar Cliente" : "Nuevo Cliente"}
             </DialogTitle>
+            <DialogDescription>
+              {editing ? "Modifica la información del cliente seleccionado." : "Completa el formulario para registrar un nuevo cliente en el sistema."}
+            </DialogDescription>
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -807,12 +1744,15 @@ export default function ClientesPage() {
                   id="fecha_nacimiento"
                   type="date"
                   value={formData.fecha_nacimiento}
+                  placeholder="Seleccione fecha"
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, fecha_nacimiento: e.target.value }))
-                    validarFechaNacimientoEnTiempoReal(e.target.value)
+                    if (e.target.value) {
+                      validarFechaNacimientoEnTiempoReal(e.target.value)
+                    }
                   }}
-                  max={obtenerFechaMinima()}
-                  min={obtenerFechaMaxima()}
+                  max={formatearFecha(obtenerFechaMaxima())}
+                  min={formatearFecha(obtenerFechaMinima())}
                 />
                 {fechaError && (
                   <p className="text-sm text-red-600 mt-1">{fechaError}</p>
@@ -826,13 +1766,13 @@ export default function ClientesPage() {
               <div>
                 <Label htmlFor="tipo_plan">Plan *</Label>
                 <Select value={formData.tipo_plan} onValueChange={handlePlanChange}>
-                  <SelectTrigger>
+                  <SelectTrigger id="tipo_plan">
                     <SelectValue placeholder="Seleccione un plan" />
                   </SelectTrigger>
                   <SelectContent>
                     {planes.map((plan) => (
-                      <SelectItem key={plan.tipo_plan} value={plan.tipo_plan}>
-                        {plan.tipo_plan} - ${plan.precio_plan}
+                      <SelectItem key={plan.id} value={plan.id.toString()}>
+                        {plan.tipo_plan} - ${plan.precio}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -857,13 +1797,13 @@ export default function ClientesPage() {
               <div>
                 <Label htmlFor="sector">Sector *</Label>
                 <Select value={formData.sector} onValueChange={(value) => setFormData(prev => ({ ...prev, sector: value }))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="sector">
                     <SelectValue placeholder="Seleccione un sector" />
                   </SelectTrigger>
                   <SelectContent>
                     {sectores.map((sector) => (
-                      <SelectItem key={sector} value={sector}>
-                        {sector}
+                      <SelectItem key={sector.id} value={sector.id.toString()}>
+                        {sector.nombre_sector}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -905,22 +1845,11 @@ export default function ClientesPage() {
                 />
               </div>
 
-              {/* Telegram Chat ID */}
-              <div>
-                <Label htmlFor="telegram_chat_id">ID de Chat Telegram</Label>
-                <Input
-                  id="telegram_chat_id"
-                  value={formData.telegram_chat_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telegram_chat_id: e.target.value }))}
-                  placeholder="123456789"
-                />
-              </div>
-
               {/* Estado */}
               <div>
-                <Label htmlFor="estado">Estado</Label>
+                <Label htmlFor="estado_modal">Estado</Label>
                 <Select value={formData.estado} onValueChange={(value: any) => setFormData(prev => ({ ...prev, estado: value }))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="estado_modal">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -948,10 +1877,12 @@ export default function ClientesPage() {
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, cliente: null })}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Está seguro que desea eliminar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente el cliente{" "}
-              <strong>{deleteDialog.cliente?.nombres} {deleteDialog.cliente?.apellidos}</strong>.
+              Esta acción eliminará permanentemente al cliente{" "}
+              <strong>{deleteDialog.cliente?.nombres} {deleteDialog.cliente?.apellidos}</strong>{" "}
+              de la base de datos. Esta acción no se puede deshacer y también se eliminarán todos los registros relacionados 
+              (planes, pagos, notificaciones, deudas).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -962,6 +1893,298 @@ export default function ClientesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Modal de importación masiva */}
+      <Dialog open={importModalOpen} onOpenChange={handleCloseImportModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Importar Clientes Masivamente
+            </DialogTitle>
+            <DialogDescription>
+              Carga un archivo CSV o Excel con los datos de los clientes. 
+              El archivo debe contener las columnas: cédula, nombres, apellidos, email, teléfono.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Descargar plantilla */}
+            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="h-8 w-8 text-blue-600" />
+                <div>
+                  <p className="font-medium text-blue-900">¿No tienes el formato?</p>
+                  <p className="text-sm text-blue-700">Descarga la plantilla con los sectores y planes disponibles</p>
+                </div>
+              </div>
+              <Button onClick={handleDownloadTemplate} variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
+                <Download className="h-4 w-4 mr-2" />
+                Descargar Plantilla
+              </Button>
+            </div>
+
+            {/* Sectores y Planes disponibles */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 bg-gray-50 rounded-lg border">
+                <p className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Sectores Disponibles
+                </p>
+                {sectores.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {sectores.map((s) => (
+                      <Badge key={s.id} variant="outline" className="text-xs">
+                        {s.nombre_sector}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No hay sectores configurados</p>
+                )}
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border">
+                <p className="font-medium text-gray-900 mb-2 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Planes Disponibles
+                </p>
+                {planes.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {planes.map((p) => (
+                      <Badge key={p.id} variant="outline" className="text-xs">
+                        {p.tipo_plan} (${p.precio})
+                      </Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No hay planes configurados</p>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 bg-yellow-50 p-2 rounded border border-yellow-200">
+              <AlertTriangle className="h-4 w-4 inline mr-1" />
+              Si el sector o plan no existe en el sistema, se creará automáticamente durante la importación.
+            </p>
+
+            {/* Upload area */}
+            <div className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${importingFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-gray-400'}`}>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+              />
+              
+              {importingFile ? (
+                <div className="space-y-4">
+                  <FileSpreadsheet className="h-12 w-12 text-green-600 mx-auto" />
+                  <div>
+                    <p className="text-lg font-medium text-green-800">{importingFile.name}</p>
+                    <p className="text-sm text-green-600">{(importingFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                  <label htmlFor="file-upload" className="cursor-pointer inline-block">
+                    <span className="text-blue-600 hover:text-blue-800 underline text-sm">
+                      Cambiar archivo
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <label htmlFor="file-upload" className="cursor-pointer block">
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-gray-700">
+                    Arrastra un archivo o haz clic para seleccionar
+                  </p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Formato aceptado: CSV (solo UTF-8)
+                  </p>
+                </label>
+              )}
+            </div>
+
+            {/* Preview data */}
+            {previewData.length > 0 && (
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Vista previa (primeras 5 filas)</h4>
+                <div className="overflow-x-auto border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {previewData[0].map((header, idx) => (
+                          <TableHead key={idx} className="bg-gray-50">{header}</TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {previewData.slice(1).map((row, rowIdx) => (
+                        <TableRow key={rowIdx}>
+                          {row.map((cell, cellIdx) => (
+                            <TableCell key={cellIdx}>{cell}</TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {/* Results */}
+            {importResults && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 p-3 bg-green-100 rounded-lg">
+                    <Check className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800">
+                      {importResults.success} clientes importados exitosamente
+                    </span>
+                  </div>
+                  {importResults.errors.length > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-red-100 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <span className="font-medium text-red-800">
+                        {importResults.errors.length} errores
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Resumen de importación */}
+                {importSummary && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(importSummary.sectores_creados > 0 || importSummary.planes_creados > 0) && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="font-medium text-blue-900 mb-2">Elementos creados automáticamente:</p>
+                        {importSummary.nuevos_sectores.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-sm text-blue-700 font-medium">Sectores:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {importSummary.nuevos_sectores.map((sector, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                  {sector}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {importSummary.nuevos_planes.length > 0 && (
+                          <div>
+                            <p className="text-sm text-blue-700 font-medium">Planes:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {importSummary.nuevos_planes.map((plan, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                  {plan.nombre} (${plan.precio})
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="p-3 bg-gray-50 border rounded-lg">
+                      <p className="font-medium text-gray-900 mb-2">Resumen:</p>
+                      <div className="grid grid-cols-3 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-500">Procesados:</span>
+                          <span className="ml-1 font-medium">{importSummary.total_procesados}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Creados:</span>
+                          <span className="ml-1 font-medium text-green-600">{importSummary.clientes_creados}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Errores:</span>
+                          <span className="ml-1 font-medium text-red-600">{importSummary.errores}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {importResults.errors.length > 0 && (
+                  <div className="border-2 border-red-300 rounded-lg bg-red-50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <p className="font-medium text-red-800">
+                        Se encontraron {importResults.errors.length} errores de validación
+                      </p>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                      {importResults.errors.slice(0, 20).map((err, idx) => (
+                        <div key={idx} className="bg-white border border-red-200 rounded p-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="font-medium text-red-800">Fila {err.row}</p>
+                              <p className="text-sm text-red-600 mt-1">{err.error}</p>
+                            </div>
+                            {err.columnas && err.columnas.length > 0 && (
+                              <div className="flex gap-1 flex-wrap">
+                                {err.columnas.map((col, i) => (
+                                  <Badge key={i} variant="destructive" className="text-xs">
+                                    {col}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {err.data && err.data.length > 0 && (
+                            <p className="text-xs text-gray-500 mt-2">
+                              Datos: {err.data.slice(0, 5).map((d: string, i: number) => `${i+1}: "${d}"`).join(' | ')}
+                              {err.data.length > 5 && ' ...'}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {importResults.errors.length > 20 && (
+                      <p className="p-2 text-sm text-red-600 text-center font-medium mt-2">
+                        ... y {importResults.errors.length - 20} errores más
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button onClick={handleCloseImportModal} variant="outline">
+              Cerrar
+            </Button>
+            {importResults && importResults.success === 0 ? (
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload-2"
+                />
+                <Button type="button" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Seleccionar archivo corregido
+                </Button>
+              </label>
+            ) : (
+              importingFile && !importResults && (
+                <Button onClick={handleExecuteImport} disabled={importing} className="bg-green-600 hover:bg-green-700">
+                  {importing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Importando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Importar {previewData.length > 0 ? previewData.length - 1 : 'los'} Registros
+                    </>
+                  )}
+                </Button>
+              )
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
