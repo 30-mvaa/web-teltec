@@ -41,15 +41,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-your-secret-key-here-CHANGE-IN-PRODUCTION')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG solo True en desarrollo, usar variable de entorno en producción
-DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-# ALLOWED_HOSTS - usar variable de entorno en producción, valores por defecto para desarrollo
-if DEBUG:
-    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'host.docker.internal']
+# ALLOWED_HOSTS - usar variable de entorno en producción
+allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
+if allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in allowed_hosts.split(',') if h.strip()]
 else:
-    allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
-    ALLOWED_HOSTS = allowed_hosts.split(',') if allowed_hosts else []
+    ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'host.docker.internal']
 
 
 # Application definition
@@ -114,16 +113,35 @@ WSGI_APPLICATION = 'teltec_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'teltec_db'),
-        'USER': os.environ.get('DB_USER', 'teltec_user'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', '12345678'),  # Cambiar en producción
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+# Soporte para DATABASE_URL (Railway, Render, etc.)
+database_url = os.environ.get('DATABASE_URL', '')
+
+if database_url:
+    # Parsear DATABASE_URL (formato: postgres://user:pass@host:port/dbname)
+    import psycopg2
+    from urllib.parse import urlparse
+    parsed = urlparse(database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path[1:] if parsed.path else '',
+            'USER': parsed.username,
+            'PASSWORD': parsed.password,
+            'HOST': parsed.hostname,
+            'PORT': parsed.port or 5432,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'teltec_db'),
+            'USER': os.environ.get('DB_USER', 'teltec_user'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', '12345678'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 
 # Password validation
