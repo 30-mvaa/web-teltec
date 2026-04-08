@@ -1,10 +1,10 @@
+/* Bootstrap Integration - must be before @tailwind */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Bootstrap Integration */
-@import 'bootstrap/dist/css/bootstrap.min.css';
-@import 'bootstrap-icons/font/bootstrap-icons.css';
 
 /* Bootstrap Typography Variables */
 :root {
