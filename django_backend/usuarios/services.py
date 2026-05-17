@@ -26,7 +26,7 @@ class UsuarioService:
             # Usar conexión de Django directamente para evitar SQL injection
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT id, email, nombre, rol, activo, password_hash
+                    SELECT id, email, nombre, rol, activo, password
                     FROM usuarios 
                     WHERE email = %s AND activo = true
                 """, [email])
@@ -99,8 +99,8 @@ class UsuarioService:
             # Insertar usuario
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO usuarios (email, nombre, rol, password_hash, activo, fecha_creacion, fecha_actualizacion)
-                    VALUES (%s, %s, %s, %s, true, NOW(), NOW())
+                    INSERT INTO usuarios (email, nombre, rol, password, activo, date_joined)
+                    VALUES (%s, %s, %s, %s, true, NOW())
                     RETURNING id
                 """, [email, nombre, rol, password_hash])
                 user_id = cursor.fetchone()[0]
@@ -298,7 +298,7 @@ Equipo TelTec Net
             with connection.cursor() as cursor:
                 cursor.execute("""
                     UPDATE usuarios 
-                    SET password_hash = %s, reset_token = NULL, reset_token_expires = NULL
+                    SET password = %s, reset_token = NULL, reset_token_expires = NULL
                     WHERE id = %s
                 """, [password_hash, user_data[0]])
             
@@ -314,9 +314,9 @@ Equipo TelTec Net
         try:
             with connection.cursor() as cursor:
                 cursor.execute("""
-                    SELECT id, email, nombre, rol, activo, fecha_creacion, fecha_actualizacion
+                    SELECT id, email, nombre, rol, activo, date_joined
                     FROM usuarios 
-                    ORDER BY fecha_creacion DESC
+                    ORDER BY date_joined DESC
                 """)
                 users = []
                 for row in cursor.fetchall():
@@ -327,7 +327,7 @@ Equipo TelTec Net
                         'rol': row[3],
                         'activo': row[4],
                         'fecha_creacion': row[5].isoformat() if row[5] else None,
-                        'fecha_actualizacion': row[6].isoformat() if row[6] else None
+                        'fecha_actualizacion': None
                     })
                 
                 return users

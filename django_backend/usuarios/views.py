@@ -417,7 +417,7 @@ def cambiar_password(request):
         from usuarios.models import Usuario
         
         with connection.cursor() as cursor:
-            cursor.execute("SELECT password_hash FROM usuarios WHERE email = %s", [email])
+            cursor.execute("SELECT password FROM usuarios WHERE email = %s", [email])
             row = cursor.fetchone()
             
             if not row:
@@ -435,7 +435,7 @@ def cambiar_password(request):
             nuevo_hash = Usuario.hash_password(password_nuevo)
             cursor.execute("""
                 UPDATE usuarios 
-                SET password_hash = %s, fecha_actualizacion = NOW()
+                SET password = %s
                 WHERE email = %s
             """, [nuevo_hash, email])
             
