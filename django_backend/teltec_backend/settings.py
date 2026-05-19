@@ -223,11 +223,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3001",
     "http://localhost:3002",
     "http://127.0.0.1:3002",
+    "https://web-teltec-u5kr.vercel.app",
+    "https://web-teltec-u5kr.vercel.app/",
 ]
 
-# Permitir solicitudes desde archivos locales para desarrollo
-# IMPORTANTE: En producción, CORS_ALLOW_ALL_ORIGINS debe ser False
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Solo True en desarrollo
+# Permitir solicitudes desde cualquier origen (necesario para Vercel)
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuración adicional de CORS para desarrollo
