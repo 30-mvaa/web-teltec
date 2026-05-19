@@ -10,5 +10,7 @@ reportlab==4.1.0
 python-decouple==3.8
 python-dotenv==1.1.0
 bcrypt==4.3.0
-urllib3<2.0.0 
-weasyprint==66.0 
+urllib3<2.0.0
+weasyprint==66.0
+xlsxwriter==3.2.2
+requests==2.32.3 
