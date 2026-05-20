@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://teltec-backend--vangamarca4.replit.app/api/:path*"
+    }
+  ]
+}
