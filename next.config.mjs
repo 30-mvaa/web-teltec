@@ -24,7 +24,7 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:8000/api/:path*",
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://teltec-backend--vangamarca4.replit.app'}/api/:path*`,
       },
     ];
   },
