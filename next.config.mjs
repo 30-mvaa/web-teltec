@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  skipTrailingSlashRedirect: true,
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -21,10 +22,15 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://teltec-backend--vangamarca4.replit.app';
     return [
       {
+        source: "/api/:path*/",
+        destination: `${apiUrl}/api/:path*/`,
+      },
+      {
         source: "/api/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://teltec-backend--vangamarca4.replit.app'}/api/:path*`,
+        destination: `${apiUrl}/api/:path*`,
       },
     ];
   },
