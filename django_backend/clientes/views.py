@@ -382,27 +382,28 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 plan_id = request.data.get('plan_id')
                 if plan_id:
                     try:
+                        from django.db import connection
                         from django.utils import timezone
-                        from datetime import timedelta
-                        from planes_app.models import Plan
-                        from clientes_planes_app.models import ClientePlan
                         
                         # Verificar que el plan existe
-                        plan = Plan.objects.get(id=plan_id, estado='activo')
+                        cursor = connection.cursor()
+                        cursor.execute("SELECT id_plan FROM planes WHERE id_plan = %s AND estado = 'activo'", [plan_id])
+                        if not cursor.fetchone():
+                            return Response({
+                                'success': False,
+                                'message': 'Plan no encontrado o inactivo'
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                        
+                        # Obtener nuevo ID
+                        cursor.execute("SELECT COALESCE(MAX(id_cliente_plan), 0) + 1 FROM clientes_planes")
+                        nuevo_id = cursor.fetchone()[0]
                         
                         # Crear asignación de plan
-                        ClientePlan.objects.create(
-                            id_cliente=cliente,
-                            id_plan=plan,
-                            fecha_inicio=timezone.now().date(),
-                            estado='activo'
-                        )
+                        cursor.execute("""
+                            INSERT INTO clientes_planes (id_cliente_plan, id_cliente, id_plan, fecha_inicio, estado, fecha_creacion, fecha_actualizacion)
+                            VALUES (%s, %s, %s, %s, 'activo', NOW(), NOW())
+                        """, [nuevo_id, cliente.id, plan_id, timezone.now().date()])
                         
-                    except Plan.DoesNotExist:
-                        return Response({
-                            'success': False,
-                            'message': 'Plan no encontrado o inactivo'
-                        }, status=status.HTTP_400_BAD_REQUEST)
                     except Exception as e:
                         return Response({
                             'success': False,
@@ -498,28 +499,39 @@ class ClienteViewSet(viewsets.ModelViewSet):
                         from planes_app.models import Plan
                         from clientes_planes_app.models import ClientePlan
                         
+                        from django.db import connection
                         print(f"  - Asignando plan ID: {plan_id}")
+                        
                         # Verificar que el plan existe
-                        plan = Plan.objects.get(id=plan_id, estado='activo')
+                        cursor = connection.cursor()
+                        cursor.execute("SELECT id_plan FROM planes WHERE id_plan = %s AND estado = 'activo'", [plan_id])
+                        if not cursor.fetchone():
+                            print(f"  - ERROR: Plan no encontrado")
+                            return Response({
+                                'success': False,
+                                'message': 'Plan no encontrado o inactivo'
+                            }, status=status.HTTP_400_BAD_REQUEST)
                         
                         # Desactivar planes anteriores del cliente
-                        planes_anteriores = ClientePlan.objects.filter(
-                            id_cliente=cliente,
-                            estado='activo'
-                        )
-                        print(f"  - Planes anteriores encontrados: {planes_anteriores.count()}")
-                        planes_anteriores.update(estado='inactivo', fecha_fin=timezone.now().date())
+                        cursor.execute("""
+                            UPDATE clientes_planes 
+                            SET estado = 'inactivo', fecha_fin = %s 
+                            WHERE id_cliente = %s AND estado = 'activo'
+                        """, [timezone.now().date(), cliente.id])
+                        print(f"  - Planes anteriores desactivados")
+                        
+                        # Obtener nuevo ID
+                        cursor.execute("SELECT COALESCE(MAX(id_cliente_plan), 0) + 1 FROM clientes_planes")
+                        nuevo_id = cursor.fetchone()[0]
                         
                         # Crear nueva asignación de plan
-                        nuevo_plan = ClientePlan.objects.create(
-                            id_cliente=cliente,
-                            id_plan=plan,
-                            fecha_inicio=timezone.now().date(),
-                            estado='activo'
-                        )
-                        print(f"  - Nuevo plan asignado: {nuevo_plan.id}")
+                        cursor.execute("""
+                            INSERT INTO clientes_planes (id_cliente_plan, id_cliente, id_plan, fecha_inicio, estado, fecha_creacion, fecha_actualizacion)
+                            VALUES (%s, %s, %s, %s, 'activo', NOW(), NOW())
+                        """, [nuevo_id, cliente.id, plan_id, timezone.now().date()])
+                        print(f"  - Nuevo plan asignado con ID: {nuevo_id}")
                         
-                    except Plan.DoesNotExist:
+                    except Exception as e:
                         print(f"  - ERROR: Plan no encontrado")
                         return Response({
                             'success': False,
