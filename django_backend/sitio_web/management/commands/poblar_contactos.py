@@ -13,6 +13,7 @@ REDES = [
     {"tipo": "facebook", "url": "https://www.facebook.com/teltecnet"},
     {"tipo": "instagram", "url": "https://www.instagram.com/teltecnet"},
     {"tipo": "youtube", "url": "https://www.youtube.com/@teltecnet"},
+    {"tipo": "tiktok", "url": "https://www.tiktok.com/@teltecnet"},
 ]
 
 
@@ -27,3 +28,10 @@ class Command(BaseCommand):
         for r in REDES:
             obj, created = RedSocial.objects.get_or_create(tipo=r["tipo"], defaults={**r, "activo": True})
             self.stdout.write(f'  {"✅" if created else "⚠️"} RedSocial {r["tipo"]}: {obj.url}')
+
+        from sitio_web.models import Empresa
+        empresa = Empresa.objects.first()
+        if empresa:
+            empresa.email = "teltecnet@outlook.com"
+            empresa.save()
+            self.stdout.write(f'  ✅ Empresa email actualizado: {empresa.email}')

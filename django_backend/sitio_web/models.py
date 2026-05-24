@@ -18,7 +18,7 @@ class Empresa(models.Model):
     nombre = models.CharField(max_length=200, default="TelTec Net")
     direccion = models.CharField(max_length=300, default="Av. Principal 123, Centro")
     telefono = models.CharField(max_length=20, default="0999859689")
-    email = models.EmailField(default="info@teltecnet.com")
+    email = models.EmailField(default="teltecnet@outlook.com")
     ruc = models.CharField(max_length=20, default="1234567890001")
     horario = models.CharField(max_length=200, default="Lunes a Viernes: 8:00 AM - 6:00 PM")
     fecha_actualizacion = models.DateTimeField(auto_now=True)
