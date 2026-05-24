@@ -265,13 +265,28 @@ CELERY_TIMEZONE = 'America/Guayaquil'
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('SMTP_PORT', 587))
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('SMTP_USER', 'vangamarca4@gmail.com')
-EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASS', 'hcksmimksarshlkl')
-DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', 'vangamarca4@gmail.com')
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.sendgrid.net'
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    EMAIL_USE_SSL = False
+    EMAIL_HOST_USER = 'apikey'
+    EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+    DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', 'vangamarca4@gmail.com')
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('SMTP_PORT', 587))
+    EMAIL_USE_TLS = os.environ.get('SMTP_USE_TLS', 'True').lower() == 'true'
+    EMAIL_USE_SSL = os.environ.get('SMTP_USE_SSL', 'False').lower() == 'true'
+    EMAIL_HOST_USER = os.environ.get('SMTP_USER', 'vangamarca4@gmail.com')
+    EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASS', 'hcksmimksarshlkl')
+    DEFAULT_FROM_EMAIL = os.environ.get('SMTP_FROM', 'vangamarca4@gmail.com')
+
+if EMAIL_USE_SSL and not os.environ.get('SMTP_PORT'):
+    EMAIL_PORT = 465
 
 # Configuración de Caché
 CACHES = {
