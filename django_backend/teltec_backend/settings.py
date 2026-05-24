@@ -224,7 +224,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3002",
     "http://127.0.0.1:3002",
     "https://web-teltec-u5kr.vercel.app",
-    "https://web-teltec-u5kr.vercel.app/",
 ]
 
 # Permitir solicitudes desde cualquier origen (necesario para Vercel)
