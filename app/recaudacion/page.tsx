@@ -951,75 +951,14 @@ export default function RecaudacionPage() {
   const handleDescargarComprobante = useCallback(async (pagoId: number) => {
     setDownloading(pagoId);
     try {
-      const response = await fetch(API_ENDPOINTS.PAGO_DESCARGAR_COMPROBANTE(pagoId));
-      
-      // Verificar si la respuesta es un error (JSON)
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        // Es un JSON de error
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al generar el comprobante');
-      }
-      
-      if (!response.ok) {
-        // Intentar obtener el mensaje de error si es JSON
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.message || `Error HTTP: ${response.status}`);
-        } catch {
-          throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
-        }
-      }
-      
-      // Verificar que sea un PDF
-      if (!contentType || !contentType.includes('application/pdf')) {
-        // Intentar leer como JSON para obtener el mensaje de error
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'El servidor no devolvió un PDF válido');
-        } catch {
-          throw new Error('El servidor no devolvió un PDF válido. Verifique que WeasyPrint esté instalado.');
-        }
-      }
-      
-      // Crear blob y descargar
-      const blob = await response.blob();
-      
-      // Verificar que el blob no esté vacío
-      if (blob.size === 0) {
-        throw new Error('El PDF generado está vacío');
-      }
-      
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      
-      // Obtener el nombre del archivo del header o usar el ID del pago
-      const contentDisposition = response.headers.get('content-disposition');
-      let filename = `comprobante_${pagoId}.pdf`;
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-      
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast("Comprobante descargado exitosamente", "success");
+      // Abrir en nueva pestaña para que el navegador muestre el PDF nativamente
+      window.open(API_ENDPOINTS.PAGO_DESCARGAR_COMPROBANTE(pagoId), '_blank');
+      toast("Comprobante abierto exitosamente", "success");
     } catch (error: any) {
       if (process.env.NODE_ENV === 'development') {
-        console.error('Error al descargar comprobante:', error);
-        // Mostrar mensaje más detallado en consola para debugging
-        if (error.message?.includes('WeasyPrint')) {
-          console.error('⚠️ WeasyPrint no está instalado en el servidor. Instale con: pip install weasyprint');
-        }
+        console.error('Error al abrir comprobante:', error);
       }
-      const errorMessage = error.message || "Error al descargar el comprobante";
+      const errorMessage = error.message || "Error al abrir el comprobante";
       toast(errorMessage, "error");
     } finally {
       setDownloading(null);

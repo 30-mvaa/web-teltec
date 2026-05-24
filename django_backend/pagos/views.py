@@ -1079,7 +1079,6 @@ def enviar_comprobante_email(request, pago_id):
             
             # Configurar email
             msg = MIMEMultipart()
-            msg['From'] = 'teltec@outlook.com'  # Email de la empresa
             msg['To'] = cliente_data['email']
             msg['Subject'] = subject
             
@@ -1093,9 +1092,20 @@ def enviar_comprobante_email(request, pago_id):
                                 filename=f"comprobante_{pago_data['numero_comprobante']}.pdf")
             msg.attach(attachment)
             
-            # Enviar email (simulado por ahora)
-            # En un entorno de producción, configurarías un servidor SMTP real
-            print(f"Email enviado a {cliente_data['email']} con comprobante adjunto")
+            # Enviar email usando SMTP configurado en settings
+            smtp_host = getattr(settings, 'EMAIL_HOST', 'smtp.gmail.com')
+            smtp_port = getattr(settings, 'EMAIL_PORT', 587)
+            smtp_user = getattr(settings, 'EMAIL_HOST_USER', '')
+            smtp_pass = getattr(settings, 'EMAIL_HOST_PASSWORD', '')
+            smtp_from = getattr(settings, 'DEFAULT_FROM_EMAIL', 'teltecnet@outlook.com')
+
+            msg['From'] = smtp_from
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+            server.quit()
+            print(f"✅ Email enviado a {cliente_data['email']} con comprobante adjunto")
             
             # Actualizar estado de envío
             cursor.execute("""
