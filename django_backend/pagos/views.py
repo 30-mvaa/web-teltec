@@ -1050,61 +1050,22 @@ def enviar_comprobante_email(request, pago_id):
                     'message': 'Error al generar el PDF. Verifique que weasyprint esté instalado.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-            # Enviar email
-            subject = f"Comprobante de Pago - {pago_data['numero_comprobante']}"
-            message = f"""
-            Estimado/a {cliente_data['nombres']} {cliente_data['apellidos']},
-            
-            Adjunto encontrará el comprobante de pago correspondiente a su transacción.
-            
-            Detalles del pago:
-            - Número de Comprobante: {pago_data['numero_comprobante']}
-            - Fecha: {pago_data['fecha_pago']}
-            - Monto: ${pago_data['monto']:.2f}
-            - Método de Pago: {pago_data['metodo_pago'].title()}
-            - Concepto: {pago_data['concepto']}
-            
-            Gracias por confiar en nuestros servicios.
-            
-            Saludos cordiales,
-            Equipo de TelTec
-            """
-            
-            # Enviar email con PDF adjunto
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            from email.mime.base import MIMEBase
-            from email import encoders
-            import smtplib
-            
-            # Configurar email
-            msg = MIMEMultipart()
-            msg['To'] = cliente_data['email']
-            msg['Subject'] = subject
-            
-            msg.attach(MIMEText(message, 'plain'))
-            
-            # Adjuntar PDF
-            attachment = MIMEBase('application', 'pdf')
-            attachment.set_payload(pdf_content)
-            encoders.encode_base64(attachment)
-            attachment.add_header('Content-Disposition', 'attachment', 
-                                filename=f"comprobante_{pago_data['numero_comprobante']}.pdf")
-            msg.attach(attachment)
-            
-            # Enviar email usando SMTP configurado en settings
-            smtp_host = getattr(settings, 'EMAIL_HOST', 'smtp.gmail.com')
-            smtp_port = getattr(settings, 'EMAIL_PORT', 587)
-            smtp_user = getattr(settings, 'EMAIL_HOST_USER', '')
-            smtp_pass = getattr(settings, 'EMAIL_HOST_PASSWORD', '')
-            smtp_from = getattr(settings, 'DEFAULT_FROM_EMAIL', 'teltecnet@outlook.com')
+            # Enviar email usando Django EmailMessage
+            from django.core.mail import EmailMessage
 
-            msg['From'] = smtp_from
-            server = smtplib.SMTP(smtp_host, smtp_port)
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
-            server.quit()
+            email = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[cliente_data['email']],
+            )
+            email.attach(
+                filename=f"comprobante_{pago_data['numero_comprobante']}.pdf",
+                content=pdf_content,
+                mimetype='application/pdf',
+            )
+            email.send(fail_silently=False)
+
             print(f"✅ Email enviado a {cliente_data['email']} con comprobante adjunto")
             
             # Actualizar estado de envío
