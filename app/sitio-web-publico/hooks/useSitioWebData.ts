@@ -39,7 +39,7 @@ export function useSitioWebData() {
             setData(result.data)
           } else {
             console.warn('⚠️ Respuesta sin success o sin data:', result)
-            // Si no hay datos de la API, usar datos por defecto
+            setError('El servidor respondió con datos inválidos')
             setData({
               servicios: [],
               planes: [],
@@ -52,7 +52,7 @@ export function useSitioWebData() {
           console.error('❌ Error en la respuesta:', response.status, response.statusText)
           const errorText = await response.text()
           console.error('Error detallado:', errorText)
-          // Si hay error, usar datos por defecto
+          setError(`Error del servidor: ${response.status}`)
           setData({
             servicios: [],
             planes: [],
@@ -62,8 +62,9 @@ export function useSitioWebData() {
           })
         }
       } catch (err) {
-        console.error('Error al cargar datos del sitio web:', err)
-        // En caso de error, usar datos por defecto
+        const msg = err instanceof Error ? err.message : 'Error de conexión al servidor'
+        console.error('Error al cargar datos del sitio web:', msg)
+        setError(msg)
         setData({
           servicios: [],
           planes: [],

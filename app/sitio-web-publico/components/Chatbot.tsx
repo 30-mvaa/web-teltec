@@ -72,15 +72,19 @@ export default function Chatbot() {
       })
 
       let responseText = "Gracias por tu mensaje. ¿En qué más puedo ayudarte?"
+      let quickReplies = getQuickReplies("initial")
       if (response.ok) {
         const data = await response.json()
         responseText = data.respuesta || responseText
+      } else {
+        quickReplies = getQuickReplies("initial")
       }
 
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: responseText,
+        quickReplies,
         timestamp: new Date()
       }])
     } catch {

@@ -32,10 +32,13 @@ const getSpeedFromPlan = (plan: Plan) => {
     if (speedMatch) return `${speedMatch[1]}`
   }
   const precio = Number(plan.precio)
+  if (precio <= 20) return "20"
   if (precio <= 25) return "40"
   if (precio <= 35) return "80"
   if (precio <= 50) return "120"
-  return String(Math.round(precio * 1.6))
+  if (precio <= 80) return "200"
+  if (precio <= 150) return "300"
+  return `${Math.round(precio * 1.6)}`
 }
 
 const planGradients = ["from-violet-500 to-purple-600", "from-cyan-500 to-blue-600", "from-orange-500 to-amber-600"]
