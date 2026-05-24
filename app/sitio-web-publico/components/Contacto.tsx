@@ -1,6 +1,7 @@
 "use client"
 
 import { Phone, Mail, MessageCircle, MapPin, Clock, ExternalLink, Sparkles } from "lucide-react"
+import Reveal from "./Reveal"
 
 interface Contacto {
   id: number
@@ -46,36 +47,40 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
   return (
     <section id="contacto" className="py-8 md:py-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-3">
-            <Sparkles className="w-3 h-3 text-cyan-400" />
-            <span className="text-xs font-semibold text-white">Contacto</span>
+        <Reveal>
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-3">
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+              <span className="text-xs font-semibold text-white">Contacto</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Contáctanos</span>
+            </h2>
+            <p className="text-sm text-slate-300 max-w-xl mx-auto">Estamos aquí para ayudarte.</p>
           </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Contáctanos</span>
-          </h2>
-          <p className="text-sm text-slate-300 max-w-xl mx-auto">Estamos aquí para ayudarte.</p>
-        </div>
+        </Reveal>
 
         <div className="max-w-3xl mx-auto space-y-6">
           {contactosActivos.length > 0 && (
             <div>
               <div className="grid md:grid-cols-2 gap-3">
-                {contactosActivos.map((contacto) => {
+                {contactosActivos.map((contacto, index) => {
                   const Icon = iconMap[contacto.tipo.toLowerCase()] || MapPin
                   const colors = colorMap[contacto.tipo.toLowerCase()] || { gradient: 'from-slate-500 to-zinc-500' }
                   return (
-                    <a key={contacto.id} href={contacto.url || (contacto.tipo === 'email' ? `mailto:${contacto.valor}` : `tel:${contacto.valor}`)} target={contacto.url ? '_blank' : undefined} rel={contacto.url ? 'noopener noreferrer' : undefined}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-slate-400">{contacto.titulo}</p>
-                        <p className="text-sm font-medium text-white truncate">{contacto.valor}</p>
-                      </div>
-                      {contacto.url && <ExternalLink className="w-4 h-4 text-slate-500" />}
-                    </a>
+                    <Reveal key={contacto.id} delay={index * 100}>
+                      <a href={contacto.url || (contacto.tipo === 'email' ? `mailto:${contacto.valor}` : `tel:${contacto.valor}`)} target={contacto.url ? '_blank' : undefined} rel={contacto.url ? 'noopener noreferrer' : undefined}
+                        className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
+                          <Icon className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-slate-400">{contacto.titulo}</p>
+                          <p className="text-sm font-medium text-white truncate">{contacto.valor}</p>
+                        </div>
+                        {contacto.url && <ExternalLink className="w-4 h-4 text-slate-500" />}
+                      </a>
+                    </Reveal>
                   )
                 })}
               </div>
@@ -85,20 +90,22 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
           {redesSocialesArray.length > 0 && (
             <div>
               <div className="flex flex-wrap justify-center gap-3">
-                {redesSocialesArray.map((red) => {
+                {redesSocialesArray.map((red, index) => {
                   const socialColors: { [key: string]: { gradient: string } } = {
                     facebook: { gradient: 'from-blue-500 to-blue-600' }, instagram: { gradient: 'from-purple-500 to-pink-500' },
                     youtube: { gradient: 'from-red-500 to-red-600' }, linkedin: { gradient: 'from-blue-600 to-blue-700' }, twitter: { gradient: 'from-slate-400 to-slate-500' },
                   }
                   const colors = socialColors[red.tipo.toLowerCase()] || { gradient: 'from-slate-500 to-slate-600' }
                   return (
-                    <a key={red.tipo} href={red.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
-                        {socialIcons[red.tipo.toLowerCase()] || <MessageCircle className="w-5 h-5 text-white" />}
-                      </div>
-                      <p className="text-sm font-medium text-slate-300">{red.titulo}</p>
-                    </a>
+                    <Reveal key={red.tipo} delay={index * 100}>
+                      <a href={red.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
+                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
+                          {socialIcons[red.tipo.toLowerCase()] || <MessageCircle className="w-5 h-5 text-white" />}
+                        </div>
+                        <p className="text-sm font-medium text-slate-300">{red.titulo}</p>
+                      </a>
+                    </Reveal>
                   )
                 })}
               </div>

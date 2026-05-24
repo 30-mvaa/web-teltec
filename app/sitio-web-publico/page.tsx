@@ -153,7 +153,7 @@ export default function SitioWebPublicoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-gray-900 flex flex-col overflow-x-hidden" role="document">
+    <div className="min-h-screen bg-slate-900 text-gray-900 flex flex-col overflow-x-hidden animate-fade-in" role="document">
       <SkipLink />
 
       {/* SEO: JSON‑LD de organización y búsqueda de sitelinks */}

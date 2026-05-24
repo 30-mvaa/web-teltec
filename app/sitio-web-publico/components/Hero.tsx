@@ -2,6 +2,8 @@
 
 import { ArrowRight, Wifi, Zap, Shield, Clock, Sparkles } from "lucide-react"
 import { getWhatsAppLink } from "../lib/whatsapp"
+import Reveal from "./Reveal"
+import AnimatedCounter from "./AnimatedCounter"
 
 interface Informacion {
   titulo?: string
@@ -34,7 +36,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
       <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="grid lg:grid-cols-2 gap-8 items-center">
           {/* Left Content - más compacto */}
-          <div className="space-y-4">
+          <Reveal className="space-y-4">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
               <Sparkles className="w-3 h-3 text-cyan-400" />
@@ -76,15 +78,14 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
               </a>
             </div>
 
-            {/* Stats compactos */}
+            {/* Stats animated */}
             <div className="flex gap-6 pt-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                   <Zap className="w-4 h-4 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-white">500+</p>
-                  <p className="text-xs text-slate-400">Clientes</p>
+                  <AnimatedCounter end={500} suffix="+" label="Clientes" />
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -92,15 +93,14 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                   <Shield className="w-4 h-4 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-white">99.9%</p>
-                  <p className="text-xs text-slate-400">Uptime</p>
+                  <AnimatedCounter end={99} suffix=".9%" label="Uptime" />
                 </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Right Content - Visual compacto */}
-          <div className="hidden lg:flex justify-center">
+          <Reveal delay={200} className="hidden lg:flex justify-center">
             <div className="relative w-64 h-64">
               {/* Central circle */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -135,12 +135,12 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                     <p className="text-sm font-bold text-white">100%</p>
                   </div>
                 </div>
-              </div>
             </div>
-          </div>
+            </div>
+          </Reveal>
 
           {/* Mobile visual */}
-          <div className="lg:hidden flex justify-center py-4">
+          <Reveal delay={300} className="lg:hidden flex justify-center py-4">
             <div className="flex gap-4">
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10">
                 <Zap className="w-5 h-5 text-cyan-400" />
@@ -151,7 +151,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                 <span className="text-sm font-semibold text-white">100% Seguro</span>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
 
