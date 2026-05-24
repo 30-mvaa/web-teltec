@@ -1506,12 +1506,15 @@ def pagos_reales(request):
             cursor.execute("""
                 SELECT 
                     p.id, p.numero_comprobante, p.fecha_pago, 
-                    cd.nombres || ' ' || cd.apellidos as cliente_nombre,
-                    cd.cedula as cliente_cedula,
-                    cd.tipo_plan, p.concepto, p.metodo_pago, p.monto, p.estado,
+                    c.nombres || ' ' || c.apellidos as cliente_nombre,
+                    c.cedula as cliente_cedula,
+                    COALESCE(pl.tipo_plan, 'Sin plan') as tipo_plan,
+                    p.concepto, p.metodo_pago, p.monto, p.estado,
                     p.comprobante_enviado
                 FROM pagos p
-                JOIN clientes_deuda cd ON p.cliente_id = cd.id
+                JOIN clientes c ON p.cliente_id = c.id
+                LEFT JOIN clientes_planes cp ON c.id = cp.id_cliente AND cp.estado = 'activo'
+                LEFT JOIN planes pl ON cp.id_plan = pl.id_plan
                 WHERE EXTRACT(YEAR FROM p.fecha_pago) = %s
                 ORDER BY p.fecha_pago DESC
             """, [year])
