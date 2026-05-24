@@ -572,6 +572,7 @@ def get_meses_disponibles_cliente(request, cliente_id):
             count_planes = cursor.fetchone()[0]
             print(f"📊 [Meses] Cliente {cliente_id} tiene {count_planes} planes asignados")  # Debug
             
+            tipo_plan = "Sin plan activo"
             if count_planes == 0:
                 print(f"⚠️ [Meses] Cliente {cliente_id} no tiene planes asignados")  # Debug
                 precio_plan = 0.0
@@ -590,9 +591,11 @@ def get_meses_disponibles_cliente(request, cliente_id):
                 print(f"📋 [Meses] Plan activo del cliente {cliente_id}: {plan_data}")  # Debug
                 
                 if plan_data and plan_data[0] and plan_data[1] is not None:
+                    tipo_plan = str(plan_data[0])
                     precio_plan = float(plan_data[1])
-                    print(f"✅ [Meses] Plan activo encontrado: ${precio_plan}")  # Debug
+                    print(f"✅ [Meses] Plan activo encontrado: {tipo_plan} - ${precio_plan}")  # Debug
                 else:
+                    tipo_plan = "Sin plan activo"
                     precio_plan = 0.0
                     print(f"⚠️ [Meses] Cliente {cliente_id} no tiene plan activo válido")  # Debug
             
@@ -671,12 +674,12 @@ def get_meses_disponibles_cliente(request, cliente_id):
             'success': True,
             'data': {
                 'cliente': {
-                        'id': cliente_id,
+                    'id': cliente_id,
                     'nombres': cliente_data[0],
                     'apellidos': cliente_data[1],
                     'cedula': cliente_data[2],
-                    'tipo_plan': cliente_data[3],
-                        'precio_plan': precio_plan
+                    'tipo_plan': tipo_plan,
+                    'precio_plan': precio_plan
                 },
                     'meses_disponibles': meses_disponibles,
                     'total_meses_disponibles': len([m for m in meses_disponibles if not m['ya_pagado']]),
