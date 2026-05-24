@@ -59,6 +59,9 @@ Thumbs.db
 *.temp
 .cache/
 
+# Neon SQL exports
+neon_*.sql
+
 # Database
 *.db
 *.sqlite
