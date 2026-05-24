@@ -1,10 +1,13 @@
 "use client"
 
 import { MessageCircle } from "lucide-react"
-import { getWhatsappPhone } from "../lib/whatsapp"
 
-export default function WhatsAppButton() {
-  const whatsappNumber = getWhatsappPhone()
+interface WhatsAppButtonProps {
+  phone?: string
+}
+
+export default function WhatsAppButton({ phone }: WhatsAppButtonProps) {
+  const whatsappNumber = phone || "593984517703"
   const whatsappMessage = "Hola, estoy interesado en los servicios de T&Tnet"
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
 

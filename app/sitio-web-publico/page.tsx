@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import dynamic from "next/dynamic"
 import Script from "next/script"
 
@@ -130,6 +130,14 @@ export default function SitioWebPublicoPage() {
   const contactos = sitioWeb?.contactos ?? defaultContactos
   const redesSociales = sitioWeb?.redesSociales ?? {}
 
+  // Extraer número WhatsApp de los contactos
+  const whatasappPhone = useMemo(() => {
+    const wa = contactos.find((c: any) => c.tipo === 'whatsapp')
+    if (!wa?.url) return ''
+    const m = wa.url.match(/(\d{9,15})/)
+    return m ? m[1] : ''
+  }, [contactos])
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
@@ -216,7 +224,7 @@ export default function SitioWebPublicoPage() {
       />
 
       {/* Botón flotante WhatsApp */}
-      <WhatsAppButton />
+      <WhatsAppButton phone={whatasappPhone || undefined} />
 
       {/* Chatbot Inteligente */}
       <Chatbot />
