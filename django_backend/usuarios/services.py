@@ -248,14 +248,17 @@ Equipo TelTec Net
                 return True, token
 
             except Exception as email_error:
-                print(f"Error enviando email: {email_error}")
+                import traceback
+                error_detail = f"{type(email_error).__name__}: {str(email_error)}"
+                print(f"Error enviando email: {error_detail}")
+                traceback.print_exc()
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         UPDATE usuarios 
                         SET reset_token = NULL, reset_token_expires = NULL
                         WHERE email = %s
                     """, [email])
-                return False, f"Error enviando email de recuperación: {str(email_error)}"
+                return False, f"EE: {error_detail}"
             
         except Exception as e:
             print(f"Error generando token: {e}")
