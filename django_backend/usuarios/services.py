@@ -213,14 +213,14 @@ class UsuarioService:
                     SET reset_token = %s, reset_token_expires = %s
                     WHERE email = %s
                 """, [token, expires, email])
-            
-                # Enviar email
-                try:
-                    frontend_url = os.environ.get('FRONTEND_URL', 'https://web-teltec-u5kr.vercel.app')
-                    reset_url = f"{frontend_url}/reset-password?token={token}"
 
-                    subject = "Recuperación de Contraseña - TelTec Net"
-                    message = f"""
+            # Enviar email
+            try:
+                frontend_url = os.environ.get('FRONTEND_URL', 'https://web-teltec-u5kr.vercel.app')
+                reset_url = f"{frontend_url}/reset-password?token={token}"
+
+                subject = "Recuperación de Contraseña - TelTec Net"
+                message = f"""
 Hola {nombre},
 
 Has solicitado recuperar tu contraseña en TelTec Net.
@@ -234,23 +234,21 @@ Si no solicitaste este cambio, puedes ignorar este email.
 
 Saludos,
 Equipo TelTec Net
-                    """
+                """
 
-                    # Enviar email
-                    send_mail(
-                        subject=subject,
-                        message=message,
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[email],
-                        fail_silently=False,
-                    )
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
 
-                    print(f"Email de recuperación enviado a: {email}")
-                    return True, token
-                
+                print(f"Email de recuperación enviado a: {email}")
+                return True, token
+
             except Exception as email_error:
                 print(f"Error enviando email: {email_error}")
-                # Si falla el email, limpiar el token
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         UPDATE usuarios 
