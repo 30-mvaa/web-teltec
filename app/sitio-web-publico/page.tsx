@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState, useCallback } from "react"
+import React, { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import Script from "next/script"
 
@@ -51,7 +51,6 @@ interface ContactoItem {
 //  HOOK DE DATOS
 // =========================
 import { useSitioWebData } from "./hooks/useSitioWebData"
-import { setWhatsappPhone } from "./lib/whatsapp"
 
 // =========================
 //  SKELETON & UTILIDADES
@@ -122,17 +121,6 @@ export default function SitioWebPublicoPage() {
     const t = setTimeout(() => setIsVisible(true), 80)
     return () => clearTimeout(t)
   }, [])
-
-  // Sincronizar WhatsApp desde datos del backend
-  useEffect(() => {
-    if (contactos?.length) {
-      const whatsappContact = contactos.find((c: any) => c.tipo === 'whatsapp')
-      if (whatsappContact?.url) {
-        const match = whatsappContact.url.match(/(\d{9,15})/)
-        if (match) setWhatsappPhone(match[1])
-      }
-    }
-  }, [contactos])
 
   // Carrusel eliminado - ahora usamos el logo original de la empresa
 
