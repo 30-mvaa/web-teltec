@@ -216,7 +216,8 @@ class UsuarioService:
             
             # Enviar email
             try:
-                reset_url = f"http://localhost:3000/reset-password?token={token}"
+                frontend_url = os.environ.get('FRONTEND_URL', 'https://web-teltec-u5kr.vercel.app')
+                reset_url = f"{frontend_url}/reset-password?token={token}"
                 
                 subject = "Recuperación de Contraseña - TelTec Net"
                 message = f"""
@@ -239,7 +240,7 @@ Equipo TelTec Net
                 send_mail(
                     subject=subject,
                     message=message,
-                    from_email=settings.EMAIL_HOST_USER,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[email],
                     fail_silently=False,
                 )
@@ -256,7 +257,7 @@ Equipo TelTec Net
                         SET reset_token = NULL, reset_token_expires = NULL
                         WHERE email = %s
                     """, [email])
-                return False, "Error enviando email de recuperación"
+                return False, f"Error enviando email de recuperación: {str(email_error)}"
             
         except Exception as e:
             print(f"Error generando token: {e}")
