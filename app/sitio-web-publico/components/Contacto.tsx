@@ -1,7 +1,7 @@
 "use client"
 
+import { motion } from "framer-motion"
 import { Phone, Mail, MessageCircle, MapPin, Clock, ExternalLink, Sparkles } from "lucide-react"
-import Reveal from "./Reveal"
 
 interface Contacto {
   id: number
@@ -40,80 +40,121 @@ const colorMap: { [key: string]: { gradient: string } } = {
   'horario': { gradient: 'from-amber-500 to-orange-500' },
 }
 
+const socialColors: { [key: string]: { gradient: string } } = {
+  facebook: { gradient: 'from-blue-500 to-blue-600' }, instagram: { gradient: 'from-purple-500 to-pink-500' },
+  youtube: { gradient: 'from-red-500 to-red-600' }, linkedin: { gradient: 'from-blue-600 to-blue-700' },
+  twitter: { gradient: 'from-slate-400 to-slate-500' }, tiktok: { gradient: 'from-gray-800 to-gray-900' },
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { transition: { staggerChildren: 0.1 } },
+}
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
+}
+
 export default function Contacto({ contactos, redesSociales = {} }: ContactoProps) {
   const contactosActivos = contactos?.filter(c => c.activo) || []
-  const redesSocialesArray = Object.entries(redesSociales || {}).map(([tipo, url]) => ({ tipo, url: String(url), titulo: tipo.charAt(0).toUpperCase() + tipo.slice(1) })).filter(r => r.url)
+  const redesSocialesArray = Object.entries(redesSociales || {}).map(([tipo, url]) => ({
+    tipo, url: String(url), titulo: tipo.charAt(0).toUpperCase() + tipo.slice(1)
+  })).filter(r => r.url)
 
   return (
-    <section id="contacto" className="py-8 md:py-10 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
-        <Reveal>
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-3">
-              <Sparkles className="w-3 h-3 text-cyan-400" />
-              <span className="text-xs font-semibold text-white">Contacto</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Contáctanos</span>
-            </h2>
-            <p className="text-sm text-slate-300 max-w-xl mx-auto">Estamos aquí para ayudarte.</p>
+    <section id="contacto" className="relative py-16 md:py-20 bg-gradient-to-b from-slate-900 to-slate-950 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-10"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-xs font-medium text-slate-300">Contacto</span>
           </div>
-        </Reveal>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Contáctanos</span>
+          </h2>
+          <p className="text-slate-400 mt-3 max-w-lg mx-auto text-sm">Estamos aquí para ayudarte.</p>
+        </motion.div>
 
         <div className="max-w-3xl mx-auto space-y-6">
           {contactosActivos.length > 0 && (
-            <div>
-              <div className="grid md:grid-cols-2 gap-3">
-                {contactosActivos.map((contacto, index) => {
-                  const Icon = iconMap[contacto.tipo.toLowerCase()] || MapPin
-                  const colors = colorMap[contacto.tipo.toLowerCase()] || { gradient: 'from-slate-500 to-zinc-500' }
-                  return (
-                    <Reveal key={contacto.id} delay={index * 100}>
-                      <a href={contacto.url || (contacto.tipo === 'email' ? `mailto:${contacto.valor}` : `tel:${contacto.valor}`)} target={contacto.url ? '_blank' : undefined} rel={contacto.url ? 'noopener noreferrer' : undefined}
-                        className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
-                          <Icon className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-slate-400">{contacto.titulo}</p>
-                          <p className="text-sm font-medium text-white truncate">{contacto.valor}</p>
-                        </div>
-                        {contacto.url && <ExternalLink className="w-4 h-4 text-slate-500" />}
-                      </a>
-                    </Reveal>
-                  )
-                })}
-              </div>
-            </div>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+              className="grid md:grid-cols-2 gap-3"
+            >
+              {contactosActivos.map((contacto, index) => {
+                const Icon = iconMap[contacto.tipo.toLowerCase()] || MapPin
+                const colors = colorMap[contacto.tipo.toLowerCase()] || { gradient: 'from-slate-500 to-zinc-500' }
+                return (
+                  <motion.a
+                    key={contacto.id}
+                    variants={cardVariants}
+                    whileHover={{ y: -2, scale: 1.01 }}
+                    href={contacto.url || (contacto.tipo === 'email' ? `mailto:${contacto.valor}` : `tel:${contacto.valor}`)}
+                    target={contacto.url ? '_blank' : undefined}
+                    rel={contacto.url ? 'noopener noreferrer' : undefined}
+                    className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-cyan-500/30 transition-all"
+                  >
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500">{contacto.titulo}</p>
+                      <p className="text-sm font-medium text-white truncate">{contacto.valor}</p>
+                    </div>
+                    {contacto.url && <ExternalLink className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+                  </motion.a>
+                )
+              })}
+            </motion.div>
           )}
 
           {redesSocialesArray.length > 0 && (
-            <div>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-40px" }}
+            >
               <div className="flex flex-wrap justify-center gap-3">
                 {redesSocialesArray.map((red, index) => {
-                  const socialColors: { [key: string]: { gradient: string } } = {
-                    facebook: { gradient: 'from-blue-500 to-blue-600' }, instagram: { gradient: 'from-purple-500 to-pink-500' },
-                    youtube: { gradient: 'from-red-500 to-red-600' }, linkedin: { gradient: 'from-blue-600 to-blue-700' }, twitter: { gradient: 'from-slate-400 to-slate-500' },
-                  }
                   const colors = socialColors[red.tipo.toLowerCase()] || { gradient: 'from-slate-500 to-slate-600' }
                   return (
-                    <Reveal key={red.tipo} delay={index * 100}>
-                      <a href={red.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all">
-                        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
-                          {socialIcons[red.tipo.toLowerCase()] || <MessageCircle className="w-5 h-5 text-white" />}
-                        </div>
-                        <p className="text-sm font-medium text-slate-300">{red.titulo}</p>
-                      </a>
-                    </Reveal>
+                    <motion.a
+                      key={red.tipo}
+                      variants={cardVariants}
+                      whileHover={{ y: -2, scale: 1.02 }}
+                      href={red.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-cyan-500/30 transition-all"
+                    >
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
+                        {socialIcons[red.tipo.toLowerCase()] || <MessageCircle className="w-5 h-5 text-white" />}
+                      </div>
+                      <p className="text-sm font-medium text-slate-300">{red.titulo}</p>
+                    </motion.a>
                   )
                 })}
               </div>
-            </div>
+            </motion.div>
           )}
 
           {contactosActivos.length === 0 && redesSocialesArray.length === 0 && (
-            <p className="text-slate-400 text-center">No hay información de contacto disponible</p>
+            <p className="text-slate-500 text-center">No hay información de contacto disponible</p>
           )}
         </div>
       </div>
