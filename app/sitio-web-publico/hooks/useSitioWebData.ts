@@ -25,7 +25,10 @@ export function useSitioWebData() {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const response = await fetch(API_ENDPOINTS.SITIO_WEB_PUBLICO)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(API_ENDPOINTS.SITIO_WEB_PUBLICO, { signal: controller.signal })
+        clearTimeout(timeoutId)
         
         if (response.ok) {
           const result = await response.json()
