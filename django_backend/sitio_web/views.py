@@ -348,7 +348,7 @@ def sitio_web_publico(request):
             empresa = None
         
         # Obtener servicios activos
-        servicios = list(Servicio.objects.filter(activo=True).values('id', 'nombre', 'descripcion', 'icono', 'imagen', 'orden'))
+        servicios = list(Servicio.objects.filter(activo=True).values('id', 'nombre', 'descripcion', 'icono', 'imagen', 'activo', 'orden'))
         
         # Obtener todos los planes (mostrar todos independientemente del estado para el sitio público)
         planes_data = list(Plan.objects.all().values('id', 'tipo_plan', 'precio', 'descripcion').order_by('precio'))
@@ -378,13 +378,13 @@ def sitio_web_publico(request):
             logger.info(f"Primeros sectores: {sectores[:3]}")
         
         # Obtener coberturas activas
-        coberturas = list(Cobertura.objects.filter(activo=True).values('id', 'zona', 'descripcion', 'coordenadas', 'orden'))
+        coberturas = list(Cobertura.objects.filter(activo=True).values('id', 'zona', 'descripcion', 'coordenadas', 'activo', 'orden'))
         
         # Obtener contactos activos
-        contactos = list(Contacto.objects.filter(activo=True).values('id', 'tipo', 'titulo', 'valor', 'icono', 'url', 'orden'))
+        contactos = list(Contacto.objects.filter(activo=True).values('id', 'tipo', 'titulo', 'valor', 'icono', 'url', 'activo', 'orden'))
         
         # Obtener carrusel activo
-        carrusel = list(Carrusel.objects.filter(activo=True).values('id', 'titulo', 'descripcion', 'imagen', 'video', 'enlace', 'orden'))
+        carrusel = list(Carrusel.objects.filter(activo=True).values('id', 'titulo', 'descripcion', 'imagen', 'video', 'enlace', 'activo', 'orden'))
         
         # Obtener header
         try:

@@ -57,7 +57,7 @@ const cardVariants = {
 }
 
 export default function Contacto({ contactos, redesSociales = {} }: ContactoProps) {
-  const contactosActivos = contactos?.filter(c => c.activo) || []
+  const contactosActivos = contactos?.filter(c => c.activo !== false) || []
   const redesSocialesArray = Object.entries(redesSociales || {}).map(([tipo, url]) => ({
     tipo, url: String(url), titulo: tipo.charAt(0).toUpperCase() + tipo.slice(1)
   })).filter(r => r.url)
