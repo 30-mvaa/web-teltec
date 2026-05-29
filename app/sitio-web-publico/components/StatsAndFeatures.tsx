@@ -71,3 +71,4 @@ export default function StatsAndFeatures({ isVisible }: StatsAndFeaturesProps) {
     </section>
   )
 }
+// trigger redeploy
