@@ -9,13 +9,11 @@ interface Plan {
   tipo_plan: string
   precio: number
   descripcion: string
-  velocidad?: string | null
 }
 
 interface PlanDisplay {
   id: number
   name: string
-  speed: string
   desc: string
   price: string
   featured: boolean
@@ -25,18 +23,6 @@ interface PlanDisplay {
 
 interface PlanesProps {
   planes: Plan[]
-}
-
-const getSpeedFromPlan = (plan: Plan): string => {
-  if (plan.velocidad) return plan.velocidad
-  const precio = Number(plan.precio)
-  if (precio <= 20) return "20 Mbps"
-  if (precio <= 25) return "40 Mbps"
-  if (precio <= 35) return "80 Mbps"
-  if (precio <= 50) return "120 Mbps"
-  if (precio <= 80) return "200 Mbps"
-  if (precio <= 150) return "300 Mbps"
-  return `${Math.round(precio * 1.6)} Mbps`
 }
 
 const getPlanFeatures = (planName: string) => {
@@ -66,7 +52,6 @@ export default function Planes({ planes }: PlanesProps) {
   const displayPlans = planes.map((plan, index) => ({
     id: plan.id,
     name: plan.tipo_plan,
-    speed: getSpeedFromPlan(plan),
     desc: plan.descripcion || `Plan ${plan.tipo_plan}`,
     price: `$${Number(plan.precio).toFixed(2)}`,
     featured: index === 1 && planes.length >= 2,
@@ -143,12 +128,9 @@ export default function Planes({ planes }: PlanesProps) {
               </div>
 
               <div className="p-5 text-center bg-black/20">
-                <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400">
-                  {plan.speed}
-                </p>
-                <p className="text-2xl font-bold text-white mt-1">
+                <p className="text-3xl font-bold text-white">
                   {plan.price}
-                  <span className="text-sm font-normal text-slate-500">/mes</span>
+                  <span className="text-base font-normal text-slate-500">/mes</span>
                 </p>
               </div>
 
