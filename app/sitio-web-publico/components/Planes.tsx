@@ -9,6 +9,7 @@ interface Plan {
   tipo_plan: string
   precio: number
   descripcion: string
+  velocidad?: string
 }
 
 interface PlanesProps {
@@ -24,21 +25,6 @@ const getPlanFeatures = (planName: string) => {
   if (name.includes('empresarial') || name.includes('business') || name.includes('corporativo'))
     return ["Atención personalizada", "Monitoreo preventivo", "IP fija"]
   return ["Instalación incluida", "Soporte técnico", "WiFi amplio"]
-}
-
-const getSpeedFromPlan = (plan: Plan) => {
-  if (plan.descripcion) {
-    const speedMatch = plan.descripcion.match(/(\d+)\s*(Mbps|mbps|MBPS)/i)
-    if (speedMatch) return `${speedMatch[1]}`
-  }
-  const precio = Number(plan.precio)
-  if (precio <= 20) return "20"
-  if (precio <= 25) return "40"
-  if (precio <= 35) return "80"
-  if (precio <= 50) return "120"
-  if (precio <= 80) return "200"
-  if (precio <= 150) return "300"
-  return `${Math.round(precio * 1.6)}`
 }
 
 const planGradients = ["from-violet-500 to-purple-600", "from-cyan-500 to-blue-600", "from-orange-500 to-amber-600"]
@@ -57,7 +43,7 @@ export default function Planes({ planes }: PlanesProps) {
   const displayPlans = planes.map((plan, index) => ({
     id: plan.id,
     name: plan.tipo_plan,
-    speed: getSpeedFromPlan(plan),
+    speed: plan.velocidad || "20 Mbps",
     desc: plan.descripcion || `Plan ${plan.tipo_plan}`,
     price: `$${Number(plan.precio).toFixed(2)}`,
     featured: index === 1 && planes.length >= 2,
@@ -135,7 +121,7 @@ export default function Planes({ planes }: PlanesProps) {
 
               <div className="p-5 text-center bg-black/20">
                 <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400">
-                  {plan.speed} <span className="text-sm font-normal text-slate-500">Mbps</span>
+                  {plan.speed}
                 </p>
                 <p className="text-2xl font-bold text-white mt-1">
                   {plan.price}

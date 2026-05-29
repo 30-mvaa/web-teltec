@@ -351,7 +351,19 @@ def sitio_web_publico(request):
         servicios = list(Servicio.objects.filter(activo=True).values('id', 'nombre', 'descripcion', 'icono', 'imagen', 'orden'))
         
         # Obtener todos los planes (mostrar todos independientemente del estado para el sitio público)
-        planes = list(Plan.objects.all().values('id', 'tipo_plan', 'precio', 'descripcion').order_by('precio'))
+        planes_data = list(Plan.objects.all().values('id', 'tipo_plan', 'precio', 'descripcion').order_by('precio'))
+        planes = []
+        for p in planes_data:
+            precio = float(p['precio']) if p['precio'] else 0
+            if precio <= 20: velocidad = "20"
+            elif precio <= 25: velocidad = "40"
+            elif precio <= 35: velocidad = "80"
+            elif precio <= 50: velocidad = "120"
+            elif precio <= 80: velocidad = "200"
+            elif precio <= 150: velocidad = "300"
+            else: velocidad = str(round(precio * 1.6))
+            p['velocidad'] = f"{velocidad} Mbps"
+            planes.append(p)
         
         # Obtener todos los sectores (mostrar todos independientemente del estado para el sitio público)
         sectores = list(Sector.objects.all().values('id', 'nombre_sector', 'descripcion').order_by('nombre_sector'))
