@@ -9,11 +9,34 @@ interface Plan {
   tipo_plan: string
   precio: number
   descripcion: string
-  velocidad?: string
+  velocidad?: string | null
+}
+
+interface PlanDisplay {
+  id: number
+  name: string
+  speed: string
+  desc: string
+  price: string
+  featured: boolean
+  features: string[]
+  gradient: string
 }
 
 interface PlanesProps {
   planes: Plan[]
+}
+
+const getSpeedFromPlan = (plan: Plan): string => {
+  if (plan.velocidad) return plan.velocidad
+  const precio = Number(plan.precio)
+  if (precio <= 20) return "20 Mbps"
+  if (precio <= 25) return "40 Mbps"
+  if (precio <= 35) return "80 Mbps"
+  if (precio <= 50) return "120 Mbps"
+  if (precio <= 80) return "200 Mbps"
+  if (precio <= 150) return "300 Mbps"
+  return `${Math.round(precio * 1.6)} Mbps`
 }
 
 const getPlanFeatures = (planName: string) => {
@@ -43,7 +66,7 @@ export default function Planes({ planes }: PlanesProps) {
   const displayPlans = planes.map((plan, index) => ({
     id: plan.id,
     name: plan.tipo_plan,
-    speed: plan.velocidad || "20 Mbps",
+    speed: getSpeedFromPlan(plan),
     desc: plan.descripcion || `Plan ${plan.tipo_plan}`,
     price: `$${Number(plan.precio).toFixed(2)}`,
     featured: index === 1 && planes.length >= 2,
