@@ -165,7 +165,7 @@ export default function SitioWebPublicoPage() {
           url: "https://www.teltecnet.ec",
           logo: "https://www.teltecnet.ec/logo.png",
           contactPoint: contactos
-            .filter((c) => c.activo)
+            .filter((c) => c.activo !== false)
             .map((c) => ({
               "@type": "ContactPoint",
               telephone: c.tipo === "telefono" || c.tipo === "whatsapp" ? c.valor : undefined,

@@ -19,8 +19,8 @@ const socialIcons: { [key: string]: JSX.Element } = {
 
 export default function Footer({ empresa, contactos = [], redesSociales = {} }: FooterProps) {
   const currentYear = new Date().getFullYear()
-  const emailContact = contactos.find(c => c.tipo === 'email' && c.activo)
-  const phoneContact = contactos.find(c => c.tipo === 'telefono' && c.activo)
+  const emailContact = contactos.find(c => c.tipo === 'email' && c.activo !== false)
+  const phoneContact = contactos.find(c => c.tipo === 'telefono' && c.activo !== false)
   const redesArray = Object.entries(redesSociales || {}).map(([tipo, url]) => ({ tipo, url: String(url) })).filter(r => r.url)
 
   return (
