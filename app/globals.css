@@ -70,7 +70,7 @@
 
 body {
   background-color: #0f172a !important;
-  color: hsl(var(--foreground));
+  color: #e2e8f0;
 }
 
 html {
