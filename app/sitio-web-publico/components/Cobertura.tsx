@@ -16,7 +16,7 @@ interface CoberturaProps {
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { transition: { staggerChildren: 0.15 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
 }
 
 const itemVariants = {

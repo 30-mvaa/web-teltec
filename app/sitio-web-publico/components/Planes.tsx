@@ -40,7 +40,7 @@ const planGradients = ["from-teltec-blue to-teltec-blue-dark", "from-teltec-blue
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { transition: { staggerChildren: 0.15 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.15 } },
 }
 
 const cardVariants = {
