@@ -45,22 +45,18 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Colores eléctricos para T&Tnet
-        electric: {
+        // Colores corporativos Teltec Net
+        teltec: {
           blue: {
-            DEFAULT: "#00BFFF",
-            light: "#00CCFF",
-            dark: "#0099CC",
+            DEFAULT: "#0060B5",
+            light: "#3380C7",
+            dark: "#004D91",
           },
           green: {
-            DEFAULT: "#00FF00",
-            light: "#32FF32",
-            dark: "#00CC00",
+            DEFAULT: "#009E2F",
+            light: "#33B258",
+            dark: "#007E25",
           },
-        },
-        brand: {
-          yellow: "#FFD700",
-          red: "#FF0000",
         },
       },
       borderRadius: {

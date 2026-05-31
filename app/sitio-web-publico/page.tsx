@@ -84,7 +84,7 @@ function SkipLink() {
   return (
       <a 
       href="#contenido" 
-      className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-blue-600 px-3 py-2 text-sm text-white shadow-lg outline-none focus:not-sr-only focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-teltec-blue px-3 py-2 text-sm text-white shadow-lg outline-none focus:not-sr-only focus:ring-2 focus:ring-teltec-blue focus:ring-offset-2"
     >
       Saltar al contenido
     </a>
@@ -143,7 +143,7 @@ export default function SitioWebPublicoPage() {
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="text-center">
           <div className="relative mx-auto mb-4 h-16 w-16">
-            <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+            <div className="mx-auto h-16 w-16 animate-spin rounded-full border-4 border-teltec-blue border-t-transparent" />
           </div>
           <p className="text-lg font-medium text-gray-900">Cargando Teltec Net…</p>
           <p className="mt-2 text-sm text-gray-600">Conectando con el futuro</p>

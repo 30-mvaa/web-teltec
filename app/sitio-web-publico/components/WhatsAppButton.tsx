@@ -20,7 +20,7 @@ export default function WhatsAppButton({ phone }: WhatsAppButtonProps) {
       aria-label="Contactar por WhatsApp"
     >
       <MessageCircle className="w-6 h-6 text-white" />
-      <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#FF0000] rounded-full animate-pulse border-2 border-white"></span>
+      <span className="absolute -top-1 -right-1 w-3 h-3 bg-teltec-green rounded-full animate-pulse border-2 border-white"></span>
     </a>
   )
 }

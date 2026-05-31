@@ -30,7 +30,7 @@ export default function Footer({ empresa, contactos = [], redesSociales = {} }: 
         <div className="grid md:grid-cols-4 gap-8">
           <div className="md:col-span-1 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teltec-blue to-teltec-blue-dark flex items-center justify-center shadow-lg shadow-teltec-blue/25">
                 <Wifi className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -50,7 +50,7 @@ export default function Footer({ empresa, contactos = [], redesSociales = {} }: 
                     target="_blank"
                     rel="noopener noreferrer"
                     whileHover={{ scale: 1.1, y: -2 }}
-                    className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-cyan-500/20 hover:border-cyan-500/30 border border-white/10 transition-all"
+                    className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-teltec-blue/20 hover:border-teltec-blue/30 border border-white/10 transition-all"
                   >
                     {socialIcons[red.tipo] || <Wifi className="w-4 h-4" />}
                   </motion.a>
@@ -63,23 +63,23 @@ export default function Footer({ empresa, contactos = [], redesSociales = {} }: 
             <h3 className="text-sm font-semibold text-white mb-4">Contacto</h3>
             <div className="space-y-3 text-sm text-slate-400">
               {phoneContact && (
-                <a href={`tel:${phoneContact.valor}`} className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors">
-                  <Phone className="w-4 h-4 text-cyan-400" /> {phoneContact.valor}
+                <a href={`tel:${phoneContact.valor}`} className="flex items-center gap-2.5 hover:text-teltec-blue-light transition-colors">
+                  <Phone className="w-4 h-4 text-teltec-blue-light" /> {phoneContact.valor}
                 </a>
               )}
               {emailContact && (
-                <a href={`mailto:${emailContact.valor}`} className="flex items-center gap-2.5 hover:text-cyan-400 transition-colors break-all">
-                  <Mail className="w-4 h-4 text-cyan-400 flex-shrink-0" /> {emailContact.valor}
+                <a href={`mailto:${emailContact.valor}`} className="flex items-center gap-2.5 hover:text-teltec-blue-light transition-colors break-all">
+                  <Mail className="w-4 h-4 text-teltec-blue-light flex-shrink-0" /> {emailContact.valor}
                 </a>
               )}
               {empresa?.direccion && (
                 <p className="flex items-center gap-2.5">
-                  <MapPin className="w-4 h-4 text-cyan-400 flex-shrink-0" /> {empresa.direccion}
+                  <MapPin className="w-4 h-4 text-teltec-blue-light flex-shrink-0" /> {empresa.direccion}
                 </p>
               )}
               {empresa?.horario && (
                 <p className="flex items-center gap-2.5">
-                  <Clock className="w-4 h-4 text-cyan-400 flex-shrink-0" /> {empresa.horario}
+                  <Clock className="w-4 h-4 text-teltec-blue-light flex-shrink-0" /> {empresa.horario}
                 </p>
               )}
             </div>
@@ -90,7 +90,7 @@ export default function Footer({ empresa, contactos = [], redesSociales = {} }: 
             <ul className="space-y-2.5 text-sm">
               {["Inicio", "Servicios", "Planes", "Cobertura", "Contacto"].map((link) => (
                 <li key={link}>
-                  <a href={`#${link.toLowerCase()}`} className="text-slate-400 hover:text-cyan-400 transition-colors">
+                  <a href={`#${link.toLowerCase()}`} className="text-slate-400 hover:text-teltec-blue-light transition-colors">
                     {link}
                   </a>
                 </li>
@@ -106,7 +106,7 @@ export default function Footer({ empresa, contactos = [], redesSociales = {} }: 
               rel="noopener noreferrer"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2.5 px-5 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-green-500/25"
+              className="inline-flex items-center gap-2.5 px-5 py-3 text-sm font-semibold rounded-xl bg-gradient-to-r from-teltec-green to-teltec-green-dark text-white hover:from-teltec-green-light hover:to-teltec-green transition-all shadow-lg shadow-teltec-green/25"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.195.194 1.612.181.599-.019 1.56-.479 1.977-1.379.298-.601.446-1.123.496-1.287.05-.174.027-.3-.015-.42-.038-.117-.147-.223-.326-.346Z"/></svg>
               WhatsApp

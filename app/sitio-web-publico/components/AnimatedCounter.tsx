@@ -36,7 +36,7 @@ export default function AnimatedCounter({ end, suffix = "", prefix = "", duratio
         initial={{ scale: 0.5, opacity: 0 }}
         animate={isInView ? { scale: 1, opacity: 1 } : {}}
         transition={{ type: "spring", stiffness: 200, damping: 15 }}
-        className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent"
+        className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-teltec-blue-light to-teltec-blue bg-clip-text text-transparent"
       >
         {prefix}{count}{suffix}
       </motion.div>

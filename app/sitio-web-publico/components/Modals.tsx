@@ -344,7 +344,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
             
             <div className="p-6">
               <div className="mb-6">
-                <p className="text-lg text-blue-600 font-semibold mb-2">
+                <p className="text-lg text-teltec-blue font-semibold mb-2">
                   {productDetails.subtitle}
                 </p>
                 <p className="text-slate-600 leading-relaxed">
@@ -357,8 +357,8 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {productDetails.features.map((feature, index) => (
                     <div key={index} className="flex items-start p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
-                        <CheckCircle className="w-6 h-6 text-blue-600" />
+                      <div className="w-12 h-12 bg-teltec-blue/10 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                        <CheckCircle className="w-6 h-6 text-teltec-blue" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-slate-900 mb-1">{feature.text}</h4>
@@ -380,11 +380,11 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                             <h4 className="text-lg font-bold text-slate-900">{model.name}</h4>
                             <p className="text-slate-600 text-sm">{model.description}</p>
                           </div>
-                          <span className="text-lg font-bold text-green-600">{model.price}</span>
+                          <span className="text-lg font-bold text-teltec-green">{model.price}</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {model.features.map((feature, featureIndex) => (
-                            <span key={featureIndex} className="px-3 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                            <span key={featureIndex} className="px-3 py-1 bg-teltec-blue/10 text-teltec-blue text-xs rounded-full font-medium">
                               {feature}
                             </span>
                           ))}
@@ -398,7 +398,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   onClick={() => window.open(getWhatsAppLink(), '_blank')}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl"
+                  className="flex-1 bg-teltec-blue hover:bg-teltec-blue-dark text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <Phone className="w-5 h-5 mr-2" />
                   Solicitar Cotización
@@ -409,7 +409,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                     onCloseProduct()
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl"
+                  className="flex-1 border-2 border-teltec-green text-teltec-green hover:bg-teltec-green hover:text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Más Información
@@ -439,7 +439,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
             
             <div className="p-6">
               <div className="mb-6">
-                <p className="text-lg text-blue-600 font-semibold mb-2">
+                <p className="text-lg text-teltec-blue font-semibold mb-2">
                   {serviceDetails.subtitle}
                 </p>
                 <p className="text-slate-600 leading-relaxed">
@@ -452,8 +452,8 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {serviceDetails.features.map((feature, index) => (
                     <div key={index} className="flex items-start p-4 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
-                        <CheckCircle className="w-6 h-6 text-blue-600" />
+                      <div className="w-12 h-12 bg-teltec-blue/10 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
+                        <CheckCircle className="w-6 h-6 text-teltec-blue" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-slate-900 mb-1">{feature.text}</h4>
@@ -469,8 +469,8 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                   <h3 className="text-xl font-bold text-slate-900 mb-4">Beneficios Incluidos</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {serviceDetails.benefits.map((benefit, index) => (
-                      <div key={index} className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
-                        <CheckCircle className="w-5 h-5 text-green-600 mr-3 flex-shrink-0" />
+                      <div key={index} className="flex items-center p-3 bg-teltec-green/5 rounded-lg border border-teltec-green/20">
+                        <CheckCircle className="w-5 h-5 text-teltec-green mr-3 flex-shrink-0" />
                         <span className="text-slate-700 font-medium">{benefit}</span>
                       </div>
                     ))}
@@ -483,8 +483,8 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                   <h3 className="text-xl font-bold text-slate-900 mb-4">¿Qué Incluye el Servicio?</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {serviceDetails.includes.map((item, index) => (
-                      <div key={index} className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <Star className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0" />
+                      <div key={index} className="flex items-center p-3 bg-teltec-blue/5 rounded-lg border border-teltec-blue/20">
+                        <Star className="w-5 h-5 text-teltec-blue mr-3 flex-shrink-0" />
                         <span className="text-slate-700 font-medium">{item}</span>
                       </div>
                     ))}
@@ -498,7 +498,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                   <div className="flex flex-wrap gap-2">
                     {serviceDetails.process.map((step, index) => (
                       <div key={index} className="flex items-center">
-                        <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold mr-2">
+                        <span className="w-8 h-8 bg-teltec-blue text-white rounded-full flex items-center justify-center text-sm font-bold mr-2">
                           {index + 1}
                         </span>
                         <span className="text-slate-700 font-medium mr-3">{step}</span>
@@ -514,7 +514,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button
                   onClick={() => window.open(getWhatsAppLink(), '_blank')}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl"
+                  className="flex-1 bg-teltec-blue hover:bg-teltec-blue-dark text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <Phone className="w-5 h-5 mr-2" />
                   Solicitar Servicio
@@ -525,7 +525,7 @@ export default function Modals({ selectedProduct, selectedService, onCloseProduc
                     onCloseService()
                   }}
                   variant="outline"
-                  className="flex-1 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white font-semibold py-3 px-6 rounded-xl"
+                  className="flex-1 border-2 border-teltec-green text-teltec-green hover:bg-teltec-green hover:text-white font-semibold py-3 px-6 rounded-xl"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Más Información

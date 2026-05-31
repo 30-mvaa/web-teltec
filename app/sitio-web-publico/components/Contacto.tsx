@@ -35,8 +35,8 @@ const socialIcons: { [key: string]: JSX.Element } = {
 }
 
 const colorMap: { [key: string]: { gradient: string } } = {
-  'telefono': { gradient: 'from-blue-500 to-cyan-500' }, 'email': { gradient: 'from-red-500 to-rose-500' },
-  'whatsapp': { gradient: 'from-green-500 to-emerald-500' }, 'direccion': { gradient: 'from-slate-500 to-zinc-500' },
+  'telefono': { gradient: 'from-teltec-blue to-teltec-blue-dark' }, 'email': { gradient: 'from-teltec-blue-light to-teltec-blue' },
+  'whatsapp': { gradient: 'from-teltec-green to-teltec-green-dark' }, 'direccion': { gradient: 'from-slate-500 to-zinc-500' },
   'horario': { gradient: 'from-amber-500 to-orange-500' },
 }
 
@@ -65,7 +65,7 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
   return (
     <section id="contacto" className="relative py-16 md:py-20 bg-gradient-to-b from-slate-900 to-slate-950 overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-teltec-blue/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -77,11 +77,11 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
           className="text-center mb-10"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <Sparkles className="w-3.5 h-3.5 text-teltec-blue-light" />
             <span className="text-xs font-medium text-slate-300">Contacto</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Contáctanos</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-teltec-blue-light to-teltec-blue">Contáctanos</span>
           </h2>
           <p className="text-slate-400 mt-3 max-w-lg mx-auto text-sm">Estamos aquí para ayudarte.</p>
         </motion.div>
@@ -106,7 +106,7 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
                     href={contacto.url || (contacto.tipo === 'email' ? `mailto:${contacto.valor}` : `tel:${contacto.valor}`)}
                     target={contacto.url ? '_blank' : undefined}
                     rel={contacto.url ? 'noopener noreferrer' : undefined}
-                    className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-cyan-500/30 transition-all"
+                    className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-teltec-blue/30 transition-all"
                   >
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center shadow-lg`}>
                       <Icon className="w-5 h-5 text-white" />
@@ -140,7 +140,7 @@ export default function Contacto({ contactos, redesSociales = {} }: ContactoProp
                       href={red.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-cyan-500/30 transition-all"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-teltec-blue/30 transition-all"
                     >
                       <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center`}>
                         {socialIcons[red.tipo.toLowerCase()] || <MessageCircle className="w-5 h-5 text-white" />}

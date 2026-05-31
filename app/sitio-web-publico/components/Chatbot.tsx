@@ -183,11 +183,11 @@ export default function Chatbot() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-gradient-to-r from-teltec-blue to-teltec-blue-dark hover:from-teltec-blue-light hover:to-teltec-blue rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
           aria-label="Abrir chat"
         >
           <MessageCircle className="w-6 h-6 text-white" />
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse border-2 border-white"></span>
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-teltec-green rounded-full animate-pulse border-2 border-white"></span>
         </button>
       )}
 
@@ -201,10 +201,10 @@ export default function Chatbot() {
           <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2">
               <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-teltec-blue to-teltec-blue-dark rounded-full flex items-center justify-center">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-slate-900"></span>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-teltec-green rounded-full border-2 border-slate-900"></span>
               </div>
               {!isMinimized && (
                 <div>
@@ -229,13 +229,13 @@ export default function Chatbot() {
                 {messages.map((message) => (
                   <div key={message.id} className={`flex gap-2 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                     {message.role === "assistant" && (
-                      <div className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="w-7 h-7 bg-gradient-to-br from-teltec-blue to-teltec-blue-dark rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                         <Bot className="w-3.5 h-3.5 text-white" />
                       </div>
                     )}
                     <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                       message.role === "user"
-                        ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white"
+                        ? "bg-gradient-to-r from-teltec-blue to-teltec-blue-dark text-white"
                         : "bg-white text-slate-800 shadow-sm border border-slate-100"
                     }`}>
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -252,14 +252,14 @@ export default function Chatbot() {
                 ))}
                 {isLoading && (
                   <div className="flex gap-2">
-                    <div className="w-7 h-7 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center mt-0.5">
+                    <div className="w-7 h-7 bg-gradient-to-br from-teltec-blue to-teltec-blue-dark rounded-full flex items-center justify-center mt-0.5">
                       <Bot className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="bg-white rounded-2xl px-3 py-2 shadow-sm">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                        <div className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                        <div className="w-2 h-2 bg-teltec-blue rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-teltec-blue rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
+                        <div className="w-2 h-2 bg-teltec-blue rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
                       </div>
                     </div>
                   </div>
@@ -274,7 +274,7 @@ export default function Chatbot() {
                       <button
                         key={idx}
                         onClick={() => handleQuickReply(reply)}
-                        className="text-xs px-2.5 py-1 bg-white border border-slate-200 hover:border-cyan-500 hover:text-cyan-600 rounded-full transition-colors text-slate-600 font-medium"
+                        className="text-xs px-2.5 py-1 bg-white border border-slate-200 hover:border-teltec-blue hover:text-teltec-blue rounded-full transition-colors text-slate-600 font-medium"
                       >
                         {reply}
                       </button>
@@ -292,13 +292,13 @@ export default function Chatbot() {
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Escribe un mensaje..."
-                    className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teltec-blue"
                     disabled={isLoading}
                   />
                   <button
                     onClick={() => handleSendMessage()}
                     disabled={!inputMessage.trim() || isLoading}
-                    className="w-9 h-9 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-white disabled:opacity-50"
+                    className="w-9 h-9 bg-gradient-to-r from-teltec-blue to-teltec-blue-dark rounded-xl flex items-center justify-center text-white disabled:opacity-50"
                   >
                     <Send className="w-4 h-4" />
                   </button>

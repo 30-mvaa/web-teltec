@@ -35,7 +35,7 @@ export default function StatsAndFeatures({ isVisible }: StatsAndFeaturesProps) {
           className="text-center mb-10"
         >
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-            ¿Por qué elegir <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Teltec Net</span>?
+            ¿Por qué elegir <span className="text-transparent bg-clip-text bg-gradient-to-r from-teltec-blue-light to-teltec-blue">Teltec Net</span>?
           </h2>
           <p className="text-slate-400 mt-3 max-w-lg mx-auto text-sm">
             Más que internet, una experiencia de conexión confiable.
@@ -56,10 +56,10 @@ export default function StatsAndFeatures({ isVisible }: StatsAndFeaturesProps) {
                 key={feature.title}
                 variants={cardVariants}
                 whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                className="group relative p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] hover:border-cyan-500/30 transition-all"
+                className="group relative p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] hover:border-teltec-blue/30 transition-all"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <Icon className="w-6 h-6 text-cyan-400" />
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teltec-blue/20 to-teltec-blue-dark/20 border border-teltec-blue/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Icon className="w-6 h-6 text-teltec-blue-light" />
                 </div>
                 <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
                 <p className="text-sm text-slate-400 leading-relaxed">{feature.description}</p>

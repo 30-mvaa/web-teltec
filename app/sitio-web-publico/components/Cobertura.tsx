@@ -28,7 +28,7 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
   return (
     <section id="cobertura" className="relative py-16 md:py-20 bg-gradient-to-b from-slate-950 to-slate-900 overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 right-0 w-[400px] h-[400px] bg-green-500/5 rounded-full blur-[100px]" />
+        <div className="absolute -top-40 right-0 w-[400px] h-[400px] bg-teltec-green/5 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,11 +40,11 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
           className="text-center mb-10"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
-            <MapPin className="w-3.5 h-3.5 text-green-400" />
+            <MapPin className="w-3.5 h-3.5 text-teltec-green" />
             <span className="text-xs font-medium text-slate-300">Cobertura</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-            Zonas de <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-cyan-400">Cobertura</span>
+            Zonas de <span className="text-transparent bg-clip-text bg-gradient-to-r from-teltec-green to-teltec-blue-light">Cobertura</span>
           </h2>
           <p className="text-slate-400 mt-3 max-w-lg mx-auto text-sm">Priorizamos zonas donde otros no llegan. Infraestructura para comunidades rurales y urbanas.</p>
         </motion.div>
@@ -60,8 +60,8 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
             <ul className="space-y-3">
               {["Barrios y comunidades rurales", "Centros poblados", "Negocios y locales"].map((item) => (
                 <li key={item} className="flex gap-3 items-center text-sm text-slate-300">
-                  <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <div className="w-6 h-6 rounded-full bg-teltec-green/10 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teltec-green" />
                   </div>
                   {item}
                 </li>
@@ -76,7 +76,7 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
                 className="p-5 rounded-2xl bg-white/[0.03] border border-white/10"
               >
                 <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-green-400" /> Sectores disponibles
+                  <MapPin className="w-4 h-4 text-teltec-green" /> Sectores disponibles
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {sectores.map((sector, index) =>
@@ -94,7 +94,7 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onProductClick('cobertura')}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-green-500 to-cyan-500 text-white text-sm font-semibold shadow-lg shadow-green-500/25"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-teltec-green to-teltec-blue text-white text-sm font-semibold shadow-lg shadow-teltec-green/25"
             >
               <Search className="w-4 h-4" /> Consultar disponibilidad
             </motion.button>
@@ -103,7 +103,7 @@ export default function Cobertura({ sectores, onProductClick }: CoberturaProps) 
           <motion.div variants={itemVariants}>
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-xl overflow-hidden">
               <div className="flex items-center gap-2 mb-3">
-                <MapPin className="w-4 h-4 text-green-400" />
+                <MapPin className="w-4 h-4 text-teltec-green" />
                 <p className="font-semibold text-sm text-white">Mapa de cobertura</p>
               </div>
               <div className="h-64 rounded-xl border border-white/10 overflow-hidden bg-slate-800/50">

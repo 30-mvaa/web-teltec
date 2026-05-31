@@ -49,9 +49,9 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
     >
       {/* Background gradient orbs */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-cyan-500/20 rounded-full blur-[120px]" />
-        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-blue-600/15 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-violet-500/5 rounded-full blur-[150px]" />
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-teltec-blue/20 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-teltec-blue-dark/15 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teltec-blue/5 rounded-full blur-[150px]" />
         {/* Grid pattern */}
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMCAwaDQwdjQwSDB6IiBmaWxsPSJub25lIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==')] opacity-50" />
       </div>
@@ -68,7 +68,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
               variants={itemVariants}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm"
             >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <Sparkles className="w-3.5 h-3.5 text-teltec-blue-light" />
               <span className="text-xs font-medium text-slate-300">
                 Internet Wireless
               </span>
@@ -79,7 +79,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
               className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1]"
             >
               {informacion?.titulo || "TelTec Net"}
-              <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-400">
+              <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-teltec-blue-light via-teltec-blue to-teltec-blue-dark">
                 {informacion?.lema || "Conectando tu mundo digital"}
               </span>
             </motion.h1>
@@ -98,7 +98,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
             >
               <a
                 href="#planes"
-                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-sm font-semibold hover:from-cyan-400 hover:to-blue-500 transition-all duration-300 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
+                className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-teltec-blue to-teltec-blue-dark text-white text-sm font-semibold hover:from-teltec-blue-light hover:to-teltec-blue transition-all duration-300 shadow-lg shadow-teltec-blue/25 hover:shadow-teltec-blue/40"
               >
                 Ver planes
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -110,7 +110,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                 className="group inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-white/5 text-white text-sm font-semibold border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all"
               >
                 <svg
-                  className="w-5 h-5 text-green-400"
+                  className="w-5 h-5 text-teltec-green"
                   viewBox="0 0 24 24"
                   fill="currentColor"
                 >
@@ -122,8 +122,8 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
 
             <motion.div variants={itemVariants} className="flex gap-8 pt-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
-                  <Wifi className="w-5 h-5 text-cyan-400" />
+                <div className="w-10 h-10 rounded-xl bg-teltec-blue/10 border border-teltec-blue/20 flex items-center justify-center">
+                  <Wifi className="w-5 h-5 text-teltec-blue-light" />
                 </div>
                 <div>
                   <AnimatedCounter
@@ -134,9 +134,9 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-teltec-green/10 border border-teltec-green/20 flex items-center justify-center">
                   <svg
-                    className="w-5 h-5 text-green-400"
+                    className="w-5 h-5 text-teltec-green"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -167,17 +167,17 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
             <div className="relative w-80 h-80">
               {/* Animated rings */}
               <motion.div
-                className="absolute inset-0 rounded-full border border-cyan-500/20"
+                className="absolute inset-0 rounded-full border border-teltec-blue/20"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
               />
               <motion.div
-                className="absolute inset-4 rounded-full border border-blue-500/15"
+                className="absolute inset-4 rounded-full border border-teltec-blue/15"
                 animate={{ rotate: -360 }}
                 transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
               />
               <motion.div
-                className="absolute inset-8 rounded-full border border-violet-500/10"
+                className="absolute inset-8 rounded-full border border-teltec-blue-dark/10"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
               />
@@ -185,7 +185,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
               {/* Center glow */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <motion.div
-                  className="w-36 h-36 rounded-full bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 shadow-[0_0_80px_rgba(6,182,212,0.3)] flex items-center justify-center"
+                  className="w-36 h-36 rounded-full bg-gradient-to-br from-teltec-blue via-teltec-blue-dark to-teltec-blue shadow-[0_0_80px_rgba(0,96,181,0.3)] flex items-center justify-center"
                   animate={{ scale: [1, 1.05, 1] }}
                   transition={{
                     duration: 4,
@@ -211,7 +211,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teltec-green to-teltec-green-dark flex items-center justify-center">
                     <svg
                       className="w-5 h-5 text-white"
                       fill="none"
@@ -244,7 +244,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teltec-blue-light to-teltec-blue flex items-center justify-center">
                     <svg
                       className="w-5 h-5 text-white"
                       fill="none"
@@ -275,7 +275,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
           >
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10">
               <svg
-                className="w-4 h-4 text-cyan-400"
+                className="w-4 h-4 text-teltec-blue-light"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -291,7 +291,7 @@ export default function Hero({ informacion, empresa, isVisible }: HeroProps) {
             </div>
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10">
               <svg
-                className="w-4 h-4 text-green-400"
+                className="w-4 h-4 text-teltec-green"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"

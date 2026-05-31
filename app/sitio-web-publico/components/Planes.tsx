@@ -36,7 +36,7 @@ const getPlanFeatures = (planName: string) => {
   return ["Instalación incluida", "Soporte técnico", "WiFi amplio"]
 }
 
-const planGradients = ["from-violet-500 to-purple-600", "from-cyan-500 to-blue-600", "from-orange-500 to-amber-600"]
+const planGradients = ["from-teltec-blue to-teltec-blue-dark", "from-teltec-blue-light to-teltec-blue", "from-teltec-green to-teltec-green-dark"]
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -81,11 +81,11 @@ export default function Planes({ planes }: PlanesProps) {
           className="text-center mb-10"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
-            <Zap className="w-3.5 h-3.5 text-cyan-400" />
+            <Zap className="w-3.5 h-3.5 text-teltec-blue-light" />
             <span className="text-xs font-medium text-slate-300">Planes</span>
           </div>
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-            Elige tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">Internet</span>
+            Elige tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-teltec-blue-light to-teltec-blue">Internet</span>
           </h2>
           <p className="text-slate-400 mt-3 max-w-lg mx-auto text-sm">Planes flexibles sin contratos. Soporte técnico incluido.</p>
         </motion.div>
@@ -104,7 +104,7 @@ export default function Planes({ planes }: PlanesProps) {
               whileHover={{ y: -5, transition: { duration: 0.2 } }}
               className={`relative rounded-2xl border overflow-hidden ${
                 plan.featured
-                  ? "bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-cyan-500/40 shadow-[0_0_40px_rgba(6,182,212,0.12)]"
+                  ? "bg-gradient-to-b from-white/[0.08] to-white/[0.03] border-teltec-blue/40 shadow-[0_0_40px_rgba(0,96,181,0.12)]"
                   : "bg-white/[0.03] border-white/10 hover:border-white/20"
               }`}
             >
@@ -138,8 +138,8 @@ export default function Planes({ planes }: PlanesProps) {
                 <ul className="space-y-2.5">
                   {plan.features.map((f, idx) => (
                     <li key={idx} className="flex gap-2.5 items-center text-sm text-slate-300">
-                      <div className="w-5 h-5 rounded-full bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
-                        <Check className="w-3 h-3 text-cyan-400" />
+                      <div className="w-5 h-5 rounded-full bg-teltec-blue/10 flex items-center justify-center flex-shrink-0">
+                        <Check className="w-3 h-3 text-teltec-blue-light" />
                       </div>
                       {f}
                     </li>
@@ -172,9 +172,9 @@ export default function Planes({ planes }: PlanesProps) {
           className="mt-8 flex flex-wrap items-center justify-center gap-3"
         >
           {[
-            { icon: Shield, text: "Sin contrato", color: "text-green-400" },
-            { icon: Headphones, text: "Soporte 24/7", color: "text-cyan-400" },
-            { icon: Clock, text: "Instalación 24-48h", color: "text-blue-400" },
+            { icon: Shield, text: "Sin contrato", color: "text-teltec-green" },
+            { icon: Headphones, text: "Soporte 24/7", color: "text-teltec-blue-light" },
+            { icon: Clock, text: "Instalación 24-48h", color: "text-teltec-blue" },
           ].map((item) => (
             <div key={item.text} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
               <item.icon className={`w-4 h-4 ${item.color}`} />

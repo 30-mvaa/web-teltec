@@ -53,7 +53,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: HeaderProp
     >
       <nav className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between">
         <a href="#inicio" className="flex items-center gap-2.5 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 group-hover:shadow-cyan-500/40 transition-shadow">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teltec-blue to-teltec-blue-dark flex items-center justify-center shadow-lg shadow-teltec-blue/25 group-hover:shadow-teltec-blue/40 transition-shadow">
             <Wifi className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-lg text-white">Teltec Net</span>
@@ -66,7 +66,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: HeaderProp
               href={link.href}
               className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 activeSection === link.href.slice(1)
-                  ? "text-cyan-400"
+                  ? "text-teltec-blue-light"
                   : "text-slate-300 hover:text-white hover:bg-white/5"
               }`}
             >
@@ -74,7 +74,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: HeaderProp
               {activeSection === link.href.slice(1) && (
                 <motion.div
                   layoutId="nav-active"
-                  className="absolute inset-0 bg-cyan-500/10 rounded-lg border border-cyan-500/20"
+                  className="absolute inset-0 bg-teltec-blue/10 rounded-lg border border-teltec-blue/20"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
@@ -87,7 +87,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: HeaderProp
             href={getWhatsAppLink()}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-green-500/25"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-teltec-green to-teltec-green-dark text-white hover:from-teltec-green-light hover:to-teltec-green transition-all shadow-lg shadow-teltec-green/25"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.195.194 1.612.181.599-.019 1.56-.479 1.977-1.379.298-.601.446-1.123.496-1.287.05-.174.027-.3-.015-.42-.038-.117-.147-.223-.326-.346Z"/></svg>
             WhatsApp
@@ -135,7 +135,7 @@ export default function Header({ mobileMenuOpen, setMobileMenuOpen }: HeaderProp
                 href={getWhatsAppLink()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl"
+                className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-teltec-green to-teltec-green-dark rounded-xl"
               >
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.195.194 1.612.181.599-.019 1.56-.479 1.977-1.379.298-.601.446-1.123.496-1.287.05-.174.027-.3-.015-.42-.038-.117-.147-.223-.326-.346Z"/></svg>
                 WhatsApp
