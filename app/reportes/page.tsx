@@ -386,7 +386,9 @@ export default function ReportesPage() {
       }
     } catch (error) {
       setError('Error de conexión al descargar el reporte')
-      console.error('Error downloading report:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error downloading report:', error)
+      }
     }
   }
 
@@ -409,7 +411,9 @@ export default function ReportesPage() {
       }
     } catch (error) {
       setError('Error de conexión al descargar el reporte detallado')
-      console.error('Error downloading detailed report:', error)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error downloading detailed report:', error)
+      }
     }
   }
 

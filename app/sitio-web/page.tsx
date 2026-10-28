@@ -187,7 +187,9 @@ export default function SitioWebPage() {
         setFormData(response.data);
       }
     } catch (error) {
-      console.error("Error al cargar datos:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error al cargar datos:", error);
+      }
     } finally {
       setLoading(false);
     }
@@ -212,7 +214,9 @@ export default function SitioWebPage() {
         toast("Información general guardada exitosamente", "success");
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error al guardar:", error);
+      }
       toast("Error al guardar los datos", "error");
     } finally {
       setSaving(false);
@@ -233,7 +237,9 @@ export default function SitioWebPage() {
         toast("Servicios guardados exitosamente", "success");
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error al guardar:", error);
+      }
       toast("Error al guardar los servicios", "error");
     } finally {
       setSaving(false);

@@ -70,7 +70,7 @@ GRANT ALL PRIVILEGES ON DATABASE teltec_db TO teltec_user;
 - **🧾 Gestión de Gastos**: Control de gastos empresariales, reportes ingresos vs gastos
 - **👤 Perfil de Usuario**: Edición de nombre, cambio de contraseña
 - **💬 Notificaciones**: Sistema de notificaciones Telegram automáticas
-- **📊 Reportes**: Reportes detallados con exportación a Excel
+- **📊 Reportes**: Reportes detallados con exportación a Excel y PDF
 - **⚙️ Configuración**: Configuración del sistema, planes y sectores
 - **🌐 Sitio Web**: Panel de administración y sitio web público
 
@@ -115,6 +115,9 @@ GRANT ALL PRIVILEGES ON DATABASE teltec_db TO teltec_user;
 - `DELETE /api/pagos/{id}/` - Eliminar pago
 - `GET /api/pagos/{id}/descargar/` - Descargar comprobante PDF
 - `POST /api/pagos/{id}/enviar-email/` - Enviar comprobante por email
+- `GET /api/pagos/exportar-excel/` - Exportar reporte de pagos a Excel
+- `GET /api/pagos/exportar-pdf/` - Exportar reporte de pagos a PDF
+- `GET /api/pagos/exportar-deudas-excel/` - Exportar reporte de deudas a Excel
 
 ### Deudas
 - `GET /api/deudas/` - Listar deudas
@@ -184,32 +187,63 @@ GRANT ALL PRIVILEGES ON DATABASE teltec_db TO teltec_user;
 
 ## 🔧 Configuración de Variables de Entorno
 
-Crear archivo `.env.local` en la raíz del proyecto:
+Crear archivo `.env.local` en la raíz del proyecto (puedes copiar desde `.env.example`):
 
 ```env
-# Django
-SECRET_KEY=your-secret-key-here
+# === Django / Postgres ===
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres?sslmode=require
+
+# IMPORTANTE: Genera una clave segura para producción usando: python -c "import secrets; print(secrets.token_urlsafe(50))"
+DJANGO_SECRET_KEY=cambia-esto-en-produccion-usa-una-clave-segura
 DEBUG=True
+DJANGO_ENV=development
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOW_ALL_ORIGINS=True
 
-# Database
-DB_NAME=teltec_db
-DB_USER=teltec_user
-DB_PASSWORD=12345678
-DB_HOST=localhost
-DB_PORT=5432
-
-# Telegram
-TELEGRAM_BOT_TOKEN=8288608865:AAGRieiqjt73SXphtjLzg7kiK-YjqgM4udk
-
-# Email
-EMAIL_HOST_USER=your-email@gmail.com
-EMAIL_HOST_PASSWORD=your-app-password
-
-# API
+# === Frontend → Backend Django ===
 NEXT_PUBLIC_API_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:3000
+
+# === Supabase (Auth / Storage / client JS) ===
+NEXT_PUBLIC_SUPABASE_URL=https://[PROJECT-REF].supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
+SUPABASE_URL=https://[PROJECT-REF].supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOi...
+
+# === Integraciones opcionales ===
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+TELEGRAM_BOT_TOKEN=
 ```
 
-## 📊 Estructura del Proyecto
+## � Seguridad en Producción
+
+Antes de desplegar a producción, asegúrate de:
+
+1. **Generar SECRET_KEY seguro:**
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(50))"
+   ```
+   Configura la variable `DJANGO_SECRET_KEY` con el resultado.
+
+2. **Configurar ALLOWED_HOSTS:**
+   - Especifica los dominios permitidos separados por coma
+   - Ejemplo: `ALLOWED_HOSTS=teltec.com,www.teltec.com,api.teltec.com`
+
+3. **Desactivar DEBUG:**
+   ```env
+   DEBUG=False
+   DJANGO_ENV=production
+   ```
+
+4. **No compartir archivos .env:**
+   - Los archivos `.env` y `.env.local` están en `.gitignore`
+   - Nunca commits credenciales al repositorio
+
+## �📊 Estructura del Proyecto
 
 ```
 TELTEC-NET-S.A.S-B.I.C/

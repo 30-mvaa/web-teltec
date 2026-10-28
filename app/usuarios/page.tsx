@@ -98,7 +98,9 @@ export default function UsuariosPage() {
         throw new Error(json.message || "Error cargando usuarios")
       }
     } catch (e) {
-      console.error("Error en loadData:", e)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error en loadData:", e)
+      }
       setError((e as Error).message || "Error cargando usuarios")
     } finally {
       setLoading(false)
@@ -288,7 +290,9 @@ export default function UsuariosPage() {
         setError(response.message || "Error al guardar usuario")
       }
     } catch (e) {
-      console.error("Error en handleSubmit:", e)
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error en handleSubmit:", e)
+      }
       setError((e as Error).message || "Error al guardar usuario")
     }
   }

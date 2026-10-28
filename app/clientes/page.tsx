@@ -647,9 +647,6 @@ export default function ClientesPage() {
   // Abrir modal de edición
   const handleEdit = useCallback(
     (c: Cliente) => {
-      console.log("handleEdit - Cliente recibido:", c);
-      console.log("handleEdit - fecha_nacimiento:", c.fecha_nacimiento);
-      console.log("handleEdit - direccion:", c.direccion);
       setEditing(c);
 
       // Necesitamos obtener el ID del sector y plan, no solo el nombre
@@ -680,16 +677,6 @@ export default function ClientesPage() {
         telegram_chat_id: c.telegram_chat_id || "",
         estado: c.estado,
       };
-
-      console.log("handleEdit - formDataToSet:", formDataToSet);
-      console.log(
-        "handleEdit - fecha_nacimiento en formDataToSet:",
-        formDataToSet.fecha_nacimiento,
-      );
-      console.log(
-        "handleEdit - direccion en formDataToSet:",
-        formDataToSet.direccion,
-      );
 
       setFormData(formDataToSet);
       setCedulaError(null);
@@ -786,7 +773,6 @@ export default function ClientesPage() {
       return cells;
     });
 
-    console.log("CSV parsed, rows:", rows.length, "cols:", rows[0]?.length);
     return { rows, separator: "," };
   };
 
@@ -794,14 +780,7 @@ export default function ClientesPage() {
     arrayBuffer: ArrayBuffer,
   ): { rows: string[][]; separator: string } | null => {
     try {
-      console.log(
-        "Parsing Excel, buffer size:",
-        arrayBuffer.byteLength,
-        "XLSX available:",
-        typeof XLSX,
-      );
       if (!XLSX || !XLSX.read) {
-        console.error("XLSX not loaded");
         return null;
       }
       const workbook = XLSX.read(arrayBuffer, {
@@ -819,7 +798,6 @@ export default function ClientesPage() {
         header: 1,
         defval: "",
       }) as any[][];
-      console.log("Excel rows:", jsonData?.length);
 
       if (!jsonData || jsonData.length < 2) return null;
 
@@ -833,10 +811,8 @@ export default function ClientesPage() {
           return String(cell);
         });
       });
-      console.log("Parsed rows:", rows.length, "Headers:", rows[0]);
       return { rows, separator: "excel" };
     } catch (error) {
-      console.error("Error parsing Excel:", error);
       return null;
     }
   };
@@ -871,17 +847,12 @@ export default function ClientesPage() {
       if (isExcel) {
         const reader = new FileReader();
         reader.onload = (event) => {
-          console.log(
-            "Excel file read complete, result type:",
-            typeof event.target?.result,
-          );
           const arrayBuffer = event.target?.result as ArrayBuffer;
           if (!arrayBuffer) {
             toast("No se pudo leer el archivo", "error");
             return;
           }
 
-          console.log("Buffer size:", arrayBuffer.byteLength);
           const parsed = parseExcel(arrayBuffer);
           if (!parsed) {
             toast("El archivo está vacío o no tiene datos", "error");
@@ -915,7 +886,6 @@ export default function ClientesPage() {
           toast(`${rows.length - 1} registros (Excel)`, "success");
         };
         reader.onerror = (e) => {
-          console.error("FileReader error:", e);
           toast(
             "Error al leer el archivo: " + (e.target as any)?.error?.message ||
               "Error desconocido",
@@ -955,8 +925,6 @@ export default function ClientesPage() {
           const missingHeaders = requiredHeaders.filter(
             (h) => !headers.includes(h),
           );
-
-          console.log("Preview - Separator:", separator, "Headers:", headers);
 
           if (missingHeaders.length > 0) {
             toast(
@@ -1094,7 +1062,6 @@ export default function ClientesPage() {
         rows = parsed.rows;
       }
 
-      console.log("Rows count:", rows.length, "Headers:", rows[0]);
       const headers = rows[0].map((h) =>
         String(h).toLowerCase().replace(/[_\s]/g, ""),
       );
@@ -2020,7 +1987,7 @@ export default function ClientesPage() {
 
       {/* Modal de formulario */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-white text-gray-900">
           <DialogHeader>
             <DialogTitle>
               {editing ? "Editar Cliente" : "Nuevo Cliente"}
@@ -2189,7 +2156,7 @@ export default function ClientesPage() {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, email: e.target.value }))
                   }
-                  placeholder="cliente@email.com"
+                  placeholder="teltenet@email.com"
                 />
               </div>
 
